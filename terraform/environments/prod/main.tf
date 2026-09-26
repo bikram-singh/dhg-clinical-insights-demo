@@ -89,3 +89,14 @@ module "cloud_run_generator" {
 
   depends_on = [module.pubsub]
 }
+
+module "clinician_portal" {
+  source           = "../../modules/clinician-portal"
+  project_id       = var.project_id
+  region           = var.dataflow_region
+  image            = var.portal_image
+  bq_dataset       = module.bigquery.dataset_id
+  clinician_emails = var.clinician_emails
+
+  depends_on = [module.bigquery]
+}

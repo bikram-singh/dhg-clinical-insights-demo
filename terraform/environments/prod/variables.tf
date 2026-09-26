@@ -66,3 +66,14 @@ variable "generator_schedule_cron" {
   type        = string
   default     = "*/15 * * * *"
 }
+
+variable "portal_image" {
+  description = "Full Artifact Registry image path for the clinician portal container"
+  type        = string
+  default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/portal:latest"
+}
+
+variable "clinician_emails" {
+  description = "Google account emails allowed to invoke the clinician portal"
+  type        = list(string)
+}

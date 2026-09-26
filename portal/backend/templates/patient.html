@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ patient_id }} — DHG CareTrack</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f6f8; margin: 0; padding: 24px; }
+    .banner {
+      background: #fdecea; color: #c0392b; padding: 10px 16px; border-radius: 6px;
+      font-weight: bold; margin-bottom: 20px; font-size: 14px;
+    }
+    a.back { color: #2c3e50; text-decoration: none; font-size: 14px; }
+    h1 { font-size: 22px; color: #222; margin-bottom: 4px; }
+    .card {
+      background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .risk-card { border-left: 6px solid {{ risk_colors.get(risk.risk_level, '#888') if risk else '#888' }}; }
+    .risk-level { font-weight: bold; color: {{ risk_colors.get(risk.risk_level, '#888') if risk else '#888' }}; }
+    canvas { max-height: 320px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { color: #777; font-size: 12px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="banner">*** DEMONSTRATION - SYNTHETIC DATA ONLY. No real patient is involved. This is not a medical diagnosis. ***</div>
+  <a class="back" href="/">&larr; Back to patient list</a>
+  <h1>Patient: {{ patient_id }}</h1>
+
+  <div class="card risk-card">
+    <h3>Risk Insight</h3>
+    {% if risk %}
+      <p><b>Risk level:</b> <span class="risk-level">{{ risk.risk_level.upper() }}</span>
+         (score: {{ "%.2f"|format(risk.ml_risk_score) }})</p>
+      <p><b>Gemini explanation:</b> {{ risk.gemini_explanation }}</p>
+      <p style="color: #999; font-size: 12px;">Assessed at: {{ risk.created_at }}</p>
+    {% else %}
+      <p style="color: #999;">No risk assessment available yet for this patient.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Latest Diagnostic Report Note</h3>
+    {% if report %}
+      <p>{{ report.report_text_redacted }}</p>
+      <p style="color: #999; font-size: 12px;">Report date: {{ report.report_date }}</p>
+    {% else %}
+      <p style="color: #999;">No report on file.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>Vitals Trend (last {{ vitals|length }} readings)</h3>
+    <canvas id="vitalsChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3>Raw Vitals History</h3>
+    <table>
+      <tr>
+        <th>Time</th><th>HR</th><th>SpO2</th><th>BP</th><th>BMI</th>
+        <th>Weight</th><th>Height</th><th>Temp</th><th>Steps</th><th>Battery</th>
+      </tr>
+      {% for v in vitals|reverse %}
+      <tr>
+        <td>{{ v.event_timestamp }}</td>
+        <td>{{ v.heart_rate }}</td>
+        <td>{{ v.spo2 }}</td>
+        <td>{{ v.bp_systolic }}/{{ v.bp_diastolic }}</td>
+        <td>{{ v.bmi }}</td>
+        <td>{{ v.weight_kg }} kg</td>
+        <td>{{ v.height_cm }} cm</td>
+        <td>{{ v.body_temp_c }}°C</td>
+        <td>{{ v.steps }}</td>
+        <td>{{ v.battery_pct }}%</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('vitalsChart');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [
+          { label: 'Heart Rate (bpm)', data: {{ chart_heart_rate | tojson }}, borderColor: '#2980b9', tension: 0.2 },
+          { label: 'BP Systolic', data: {{ chart_bp_systolic | tojson }}, borderColor: '#c0392b', tension: 0.2 },
+          { label: 'SpO2 (%)', data: {{ chart_spo2 | tojson }}, borderColor: '#1e8449', tension: 0.2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } } }
+      }
+    });
+  </script>
+</body>
+</html>
