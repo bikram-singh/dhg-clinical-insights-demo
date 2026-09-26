@@ -1,0 +1,10 @@
+[
+  {"name": "patient_id", "type": "STRING", "mode": "REQUIRED", "description": "Synthetic patient identifier, matches FHIR Patient.id"},
+  {"name": "dummy_name_token", "type": "STRING", "mode": "NULLABLE", "description": "DLP-tokenized dummy name, not a real identifier"},
+  {"name": "gender", "type": "STRING", "mode": "NULLABLE", "description": "Synthetic, for demo realism only"},
+  {"name": "age_band", "type": "STRING", "mode": "NULLABLE", "description": "Bucketed age range, e.g. 40-50 - never raw DOB"},
+  {"name": "region", "type": "STRING", "mode": "NULLABLE", "description": "Synthetic patient region/nationality"},
+  {"name": "clinic_id", "type": "STRING", "mode": "NULLABLE", "description": "Dummy partner clinic identifier"},
+  {"name": "consent_flag", "type": "BOOLEAN", "mode": "NULLABLE", "description": "Synthetic consent flag, always true in this demo"},
+  {"name": "created_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

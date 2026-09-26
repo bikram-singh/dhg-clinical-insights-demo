@@ -1,0 +1,10 @@
+[
+  {"name": "observation_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "patient_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "observation_type", "type": "STRING", "mode": "REQUIRED", "description": "heart_rate | spo2 | bp_systolic | bp_diastolic | weight_kg | height_cm | bmi | body_temp_c | steps | battery_pct"},
+  {"name": "value", "type": "FLOAT", "mode": "REQUIRED"},
+  {"name": "unit", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "device_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "event_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingestion_time", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]
