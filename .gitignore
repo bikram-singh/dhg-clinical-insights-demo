@@ -17,3 +17,7 @@ Thumbs.db
 
 # Local scratch work, not part of the repo
 dhg-caretrack-ss.docx
+
+# OAuth secrets for the alerting service - NEVER commit these.
+alerting/credentials.json
+alerting/token.json
