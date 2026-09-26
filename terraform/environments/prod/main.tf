@@ -40,13 +40,15 @@ module "healthcare_api" {
 }
 
 module "dataflow" {
-  source           = "../../modules/dataflow"
-  project_id       = var.project_id
-  region           = var.region
-  input_topic      = module.pubsub.raw_telemetry_topic_id
-  input_subscription = module.pubsub.raw_telemetry_subscription_id
-  fhir_store_id    = module.healthcare_api.fhir_store_id
-  labels           = var.labels
+  source              = "../../modules/dataflow"
+  project_id          = var.project_id
+  region              = var.region
+  input_topic         = module.pubsub.raw_telemetry_topic_id
+  input_subscription  = module.pubsub.raw_telemetry_subscription_id
+  bq_dataset          = module.bigquery.dataset_id
+  fhir_store_id       = module.healthcare_api.fhir_store_id
+  template_gcs_path   = var.template_gcs_path
+  labels              = var.labels
 
-  depends_on = [module.pubsub, module.healthcare_api]
+  depends_on = [module.pubsub, module.healthcare_api, module.bigquery]
 }

@@ -30,3 +30,9 @@ variable "labels" {
     managed_by  = "terraform"
   }
 }
+
+variable "template_gcs_path" {
+  description = "GCS path to the built Dataflow Flex Template spec (pipeline/dataflow-beam)"
+  type        = string
+  default     = "gs://REPLACE_ME/templates/dhg-caretrack-pipeline.json"
+}
