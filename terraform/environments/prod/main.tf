@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 5.0"
+    }
   }
   # Configure your HCP Terraform / GCS backend here, matching your
   # existing gcp-hcp-terraform workspace pattern.
@@ -12,6 +16,12 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+# google_dataflow_flex_template_job is beta-only in the provider.
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -39,16 +49,26 @@ module "healthcare_api" {
   labels      = var.labels
 }
 
-module "dataflow" {
-  source              = "../../modules/dataflow"
-  project_id          = var.project_id
-  region              = var.region
-  input_topic         = module.pubsub.raw_telemetry_topic_id
-  input_subscription  = module.pubsub.raw_telemetry_subscription_id
-  bq_dataset          = module.bigquery.dataset_id
-  fhir_store_id       = module.healthcare_api.fhir_store_id
-  template_gcs_path   = var.template_gcs_path
-  labels              = var.labels
+module "networking" {
+  source          = "../../modules/networking"
+  project_id      = var.project_id
+  region          = var.region
+  dataflow_region = var.dataflow_region
+}
 
-  depends_on = [module.pubsub, module.healthcare_api, module.bigquery]
+module "dataflow" {
+  source                = "../../modules/dataflow"
+  project_id            = var.project_id
+  region                = var.dataflow_region
+  input_topic           = module.pubsub.raw_telemetry_topic_id
+  input_subscription    = module.pubsub.raw_telemetry_subscription_id
+  bq_dataset            = module.bigquery.dataset_id
+  fhir_store_id         = module.healthcare_api.fhir_store_id
+  template_gcs_path     = var.template_gcs_path
+  network_self_link     = module.networking.network_self_link
+  subnetwork_self_link  = module.networking.dataflow_subnetwork_self_link
+  worker_zone           = var.worker_zone
+  labels                = var.labels
+
+  depends_on = [module.pubsub, module.healthcare_api, module.bigquery, module.networking]
 }

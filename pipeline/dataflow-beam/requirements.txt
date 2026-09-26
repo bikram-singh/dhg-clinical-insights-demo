@@ -1,0 +1,4 @@
+apache-beam[gcp]==2.58.1
+google-api-python-client==2.143.0
+google-auth==2.34.0
+google-cloud-dlp==3.38.0

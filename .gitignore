@@ -1,0 +1,19 @@
+# Terraform state and local working files - never commit these.
+# State contains live resource IDs; .terraform/ is a local provider cache;
+# tfplan is a binary plan file specific to one machine/run.
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/tfplan
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / Office lock files
+~$*
+Thumbs.db
+.DS_Store
+
+# Local scratch work, not part of the repo
+dhg-caretrack-ss.docx

@@ -14,11 +14,12 @@ resource "google_healthcare_fhir_store" "caretrack_fhir" {
   disable_resource_versioning   = false
 
   # Streams FHIR resource changes into BigQuery for analytics
-  streaming_configs {
+  stream_configs {
     bigquery_destination {
       dataset_uri = "bq://${var.project_id}.${var.bq_dataset}"
       schema_config {
-        schema_type = "ANALYTICS"
+        schema_type               = "ANALYTICS"
+        recursive_structure_depth = 2
       }
     }
   }

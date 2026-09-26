@@ -1,0 +1,24 @@
+{
+  "name": "DHG CareTrack Pipeline",
+  "description": "Synthetic telemetry: Pub/Sub -> BigQuery + Cloud Healthcare API FHIR store",
+  "parameters": [
+    {
+      "name": "input_subscription",
+      "label": "Pub/Sub input subscription",
+      "helpText": "Full subscription path: projects/PROJECT/subscriptions/SUBSCRIPTION",
+      "isOptional": false
+    },
+    {
+      "name": "bq_dataset",
+      "label": "BigQuery dataset",
+      "helpText": "Dataset ID that holds the observations and diagnostic_reports tables",
+      "isOptional": false
+    },
+    {
+      "name": "fhir_store",
+      "label": "FHIR store path",
+      "helpText": "Full path: projects/PROJECT/locations/LOCATION/datasets/DATASET/fhirStores/STORE",
+      "isOptional": false
+    }
+  ]
+}

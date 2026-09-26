@@ -36,3 +36,15 @@ variable "template_gcs_path" {
   type        = string
   default     = "gs://REPLACE_ME/templates/dhg-caretrack-pipeline.json"
 }
+
+variable "worker_zone" {
+  description = "Explicit zone for Dataflow workers (e.g. asia-south1-a). Empty = let Dataflow pick within region."
+  type        = string
+  default     = ""
+}
+
+variable "dataflow_region" {
+  description = "Region for Dataflow compute specifically, separate from var.region, since asia-south1 hit capacity issues across all 3 zones"
+  type        = string
+  default     = "us-central1"
+}
