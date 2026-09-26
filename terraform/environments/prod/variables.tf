@@ -48,3 +48,21 @@ variable "dataflow_region" {
   type        = string
   default     = "us-central1"
 }
+
+variable "generator_image" {
+  description = "Full Artifact Registry image path for the scheduled generator Cloud Run Job"
+  type        = string
+  default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/generator:latest"
+}
+
+variable "generator_events_per_run" {
+  description = "Number of synthetic events the scheduled generator publishes per run"
+  type        = number
+  default     = 20
+}
+
+variable "generator_schedule_cron" {
+  description = "Cron schedule for the generator Cloud Run Job"
+  type        = string
+  default     = "*/15 * * * *"
+}

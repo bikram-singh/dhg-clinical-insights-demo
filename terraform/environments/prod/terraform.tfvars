@@ -4,3 +4,6 @@ dataset_id = "dhg_caretrack"
 template_gcs_path = "gs://dhg-caretrack-dataflow-templates/templates/dhg-caretrack-pipeline.json"
 worker_zone = ""
 dataflow_region = "us-central1"
+generator_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/generator:latest"
+generator_events_per_run = 20
+generator_schedule_cron = "*/15 * * * *"

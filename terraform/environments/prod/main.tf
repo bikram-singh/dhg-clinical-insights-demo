@@ -26,6 +26,10 @@ provider "google-beta" {
   region  = var.region
 }
 
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 module "pubsub" {
   source     = "../../modules/pubsub"
   project_id = var.project_id
@@ -71,4 +75,17 @@ module "dataflow" {
   labels                = var.labels
 
   depends_on = [module.pubsub, module.healthcare_api, module.bigquery, module.networking]
+}
+
+module "cloud_run_generator" {
+  source          = "../../modules/cloud-run-generator"
+  project_id      = var.project_id
+  project_number  = data.google_project.current.number
+  region          = var.dataflow_region
+  image           = var.generator_image
+  topic_name      = "patient-telemetry-raw"
+  events_per_run  = var.generator_events_per_run
+  schedule_cron   = var.generator_schedule_cron
+
+  depends_on = [module.pubsub]
 }
