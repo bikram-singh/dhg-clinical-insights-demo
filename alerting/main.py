@@ -2,8 +2,8 @@
 DHG CareTrack — Alerting Service
 
 Queries risk_assessments for recent HIGH risk_level rows and emails a
-summary to the clinician's inbox via the Gmail API (OAuth), not SMTP. This
-is the last stage of the pipeline diagram:
+formatted HTML summary to the clinician's inbox via the Gmail API (OAuth),
+not SMTP. This is the last stage of the pipeline diagram:
 risk_assessments -> high risk? -> alerting -> email.
 
 ALL DATA IS SYNTHETIC. No real patient is involved. The email sent by
@@ -39,7 +39,9 @@ approach, which Google's account-level security review was blocking):
 
 import argparse
 import base64
+import html
 import os
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from google.cloud import bigquery
@@ -52,6 +54,13 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CREDENTIALS_PATH = os.path.join(THIS_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(THIS_DIR, "token.json")
+
+# Colors for each risk_level, used in the HTML email.
+RISK_LEVEL_COLORS = {
+    "high": "#c0392b",     # red
+    "medium": "#d68910",   # amber
+    "low": "#1e8449",      # green
+}
 
 
 def get_gmail_credentials():
@@ -81,7 +90,8 @@ def get_gmail_credentials():
 
 def fetch_high_risk_assessments(bq_client, project_id, dataset, lookback_hours):
     query = f"""
-        SELECT assessment_id, patient_id, ml_risk_score, gemini_explanation, created_at
+        SELECT assessment_id, patient_id, ml_risk_score, gemini_explanation,
+               risk_level, created_at
         FROM `{project_id}.{dataset}.risk_assessments`
         WHERE risk_level = 'high'
           AND created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @lookback_hours HOUR)
@@ -95,7 +105,8 @@ def fetch_high_risk_assessments(bq_client, project_id, dataset, lookback_hours):
     return list(bq_client.query(query, job_config=job_config).result())
 
 
-def build_email_body(rows):
+def build_email_body_plain(rows):
+    """Plain-text fallback for email clients that don't render HTML."""
     lines = [
         "*** DEMONSTRATION ALERT - SYNTHETIC DATA ONLY ***",
         "No real patient is involved. This is a test notification from the",
@@ -106,20 +117,64 @@ def build_email_body(rows):
     ]
     for row in rows:
         lines.append(f"Patient: {row['patient_id']}")
-        lines.append(f"  Risk score: {row['ml_risk_score']:.2f}")
+        lines.append(f"  Risk level: {row['risk_level'].upper()} (score: {row['ml_risk_score']:.2f})")
         lines.append(f"  Explanation: {row['gemini_explanation']}")
         lines.append(f"  Assessed at: {row['created_at']}")
         lines.append("")
     return "\n".join(lines)
 
 
-def send_email_via_gmail_api(creds, from_addr, to_addr, subject, body):
+def build_email_body_html(rows):
+    """HTML version: bold labels, risk level color-coded (red/amber/green)."""
+    row_html = []
+    for row in rows:
+        level = (row["risk_level"] or "").lower()
+        color = RISK_LEVEL_COLORS.get(level, "#333333")
+        patient_id = html.escape(str(row["patient_id"]))
+        explanation = html.escape(str(row["gemini_explanation"]))
+        score = row["ml_risk_score"]
+        assessed_at = html.escape(str(row["created_at"]))
+
+        row_html.append(f"""
+        <div style="margin-bottom: 18px; padding: 12px; border-left: 4px solid {color};
+                    background: #fafafa; font-family: Arial, sans-serif;">
+          <p style="margin: 0 0 6px 0;"><b>Patient:</b> {patient_id}</p>
+          <p style="margin: 0 0 6px 0;">
+            <b>Risk level:</b>
+            <span style="color: {color}; font-weight: bold;">{html.escape(level.upper())}</span>
+            (score: {score:.2f})
+          </p>
+          <p style="margin: 0 0 6px 0;"><b>Explanation:</b> {explanation}</p>
+          <p style="margin: 0; color: #666;"><b>Assessed at:</b> {assessed_at}</p>
+        </div>
+        """)
+
+    return f"""
+    <html>
+      <body style="font-family: Arial, sans-serif;">
+        <p style="font-weight: bold; color: #c0392b;">
+          *** DEMONSTRATION ALERT - SYNTHETIC DATA ONLY ***
+        </p>
+        <p>No real patient is involved. This is a test notification from the
+        DHG CareTrack demo pipeline, not a real clinical alert.</p>
+        <p><b>{len(rows)} high-risk assessment(s) found:</b></p>
+        {''.join(row_html)}
+      </body>
+    </html>
+    """
+
+
+def send_email_via_gmail_api(creds, from_addr, to_addr, subject, plain_body, html_body):
     service = build("gmail", "v1", credentials=creds)
 
-    msg = MIMEText(body)
+    msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
     msg["To"] = to_addr
+    # Plain part first, HTML part last - most clients render the last
+    # part they understand, so HTML takes priority where supported.
+    msg.attach(MIMEText(plain_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
 
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
@@ -143,11 +198,12 @@ def main():
         print(f"No high-risk assessments in the last {args.lookback_hours}h. No email sent.")
         return
 
-    body = build_email_body(rows)
+    plain_body = build_email_body_plain(rows)
+    html_body = build_email_body_html(rows)
     subject = f"[DHG CareTrack DEMO] {len(rows)} high-risk alert(s) - synthetic data only"
 
     creds = get_gmail_credentials()
-    send_email_via_gmail_api(creds, args.from_email, args.to_email, subject, body)
+    send_email_via_gmail_api(creds, args.from_email, args.to_email, subject, plain_body, html_body)
     print(f"Sent alert email to {args.to_email} for {len(rows)} high-risk assessment(s).")
 
 
