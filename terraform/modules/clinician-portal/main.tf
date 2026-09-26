@@ -2,12 +2,11 @@
 # IAP - patient list, vitals charts, risk insight" box in the architecture
 # diagram.
 #
-# AUTH NOTE: deployed with no public invoker binding (Cloud Run's default
-# deny-all), not full Identity-Aware Proxy. Real IAP needs an external
-# HTTPS Load Balancer + reserved static IP + managed SSL cert tied to a
-# real domain - out of scope for this demo. This gives the same practical
-# protection (only IAM-authenticated identities can reach it); it just
-# lacks IAP's branded consent screen. See docs/known-deviations.md.
+# AUTH: real Identity-Aware Proxy, enabled via the separate
+# terraform/modules/portal-edge module (DNS + Load Balancer + IAP +
+# Cloud Armor). Ingress here is locked to load-balancer-only, so this
+# Cloud Run service only accepts traffic that has already passed through
+# IAP - it is not reachable directly via its own .run.app URL.
 
 resource "google_service_account" "portal_runtime" {
   account_id   = "dhg-caretrack-portal"
@@ -32,8 +31,10 @@ resource "google_cloud_run_v2_service" "portal" {
   location = var.region
   project  = var.project_id
 
-  # Deny-all by default: no ingress restriction override needed since we
-  # simply never grant roles/run.invoker to allUsers below.
+  # Only traffic that has already passed through the LB + IAP stack
+  # (terraform/modules/portal-edge) can reach this service.
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
   template {
     service_account = google_service_account.portal_runtime.email
 
@@ -57,10 +58,9 @@ resource "google_cloud_run_v2_service" "portal" {
   }
 }
 
-# Grant only the named clinician account(s) permission to invoke this
-# service - access it via:
-#   gcloud run services proxy dhg-caretrack-portal --region=REGION
-# which tunnels authenticated traffic to a local browser.
+# Kept for direct CLI/debugging access (e.g. gcloud run services proxy);
+# with ingress now locked to load-balancer-only, browser access goes
+# through the IAP-protected domain instead, set up in portal-edge.
 resource "google_cloud_run_v2_service_iam_member" "clinician_can_invoke" {
   for_each = toset(var.clinician_emails)
 
@@ -70,3 +70,4 @@ resource "google_cloud_run_v2_service_iam_member" "clinician_can_invoke" {
   role     = "roles/run.invoker"
   member   = "user:${each.value}"
 }
+

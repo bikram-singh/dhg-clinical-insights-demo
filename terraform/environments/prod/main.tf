@@ -100,3 +100,17 @@ module "clinician_portal" {
 
   depends_on = [module.bigquery]
 }
+
+module "portal_edge" {
+  source                  = "../../modules/portal-edge"
+  project_id              = var.project_id
+  project_number          = data.google_project.current.number
+  region                  = var.dataflow_region
+  subdomain               = var.portal_subdomain
+  cloud_run_service_name  = module.clinician_portal.service_name
+  iap_oauth_client_id     = var.iap_oauth_client_id
+  iap_oauth_client_secret = var.iap_oauth_client_secret
+  clinician_email         = var.clinician_emails[0]
+
+  depends_on = [module.clinician_portal]
+}

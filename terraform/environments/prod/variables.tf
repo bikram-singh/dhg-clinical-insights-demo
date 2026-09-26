@@ -77,3 +77,20 @@ variable "clinician_emails" {
   description = "Google account emails allowed to invoke the clinician portal"
   type        = list(string)
 }
+
+variable "portal_subdomain" {
+  description = "Subdomain the portal is served on, e.g. dhg-caretrack.gcpcloudhub.in"
+  type        = string
+  default     = "dhg-caretrack.gcpcloudhub.in"
+}
+
+variable "iap_oauth_client_id" {
+  description = "OAuth client ID (Web application type) created manually in the console for IAP"
+  type        = string
+}
+
+variable "iap_oauth_client_secret" {
+  description = "OAuth client secret paired with iap_oauth_client_id"
+  type        = string
+  sensitive   = true
+}
