@@ -65,6 +65,7 @@ resource "google_project_iam_member" "github_actions_roles" {
     "roles/iam.serviceAccountAdmin",
     "roles/iam.securityAdmin",
     "roles/artifactregistry.admin",
+    "roles/secretmanager.admin",
   ])
 
   project = var.project_id
