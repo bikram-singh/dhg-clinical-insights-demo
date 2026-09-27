@@ -16,3 +16,4 @@ clinician_emails = ["admin@gcpcloudhub.in"]
 # Set back to "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" once the domain's
 # DNS is actually fixed.
 portal_ingress = "INGRESS_TRAFFIC_ALL"
+partner_api_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/partner-api:latest"

@@ -100,3 +100,9 @@ variable "iap_oauth_client_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "partner_api_image" {
+  description = "Full Artifact Registry image path for the partner-clinic API container"
+  type        = string
+  default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/partner-api:latest"
+}

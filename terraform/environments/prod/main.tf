@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/google-beta"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
   # Configure your HCP Terraform / GCS backend here, matching your
   # existing gcp-hcp-terraform workspace pattern.
@@ -114,4 +118,15 @@ module "portal_edge" {
   clinician_email         = var.clinician_emails[0]
 
   depends_on = [module.clinician_portal]
+}
+
+module "partner_api" {
+  source           = "../../modules/partner-api"
+  project_id       = var.project_id
+  region           = var.dataflow_region
+  image            = var.partner_api_image
+  bq_dataset       = module.bigquery.dataset_id
+  clinician_emails = var.clinician_emails
+
+  depends_on = [module.bigquery]
 }
