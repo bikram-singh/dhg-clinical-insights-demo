@@ -4,9 +4,13 @@
 #
 # AUTH: real Identity-Aware Proxy, enabled via the separate
 # terraform/modules/portal-edge module (DNS + Load Balancer + IAP +
-# Cloud Armor). Ingress here is locked to load-balancer-only, so this
-# Cloud Run service only accepts traffic that has already passed through
-# IAP - it is not reachable directly via its own .run.app URL.
+# Cloud Armor). var.ingress controls how locked-down this is:
+#   - "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" (the real end state): only
+#     traffic that has already passed through IAP can reach this service;
+#     gcloud run services proxy stops working, since that bypasses the LB.
+#   - "INGRESS_TRAFFIC_ALL" (temporary): reopens direct/proxy access,
+#     useful while the custom domain's DNS delegation is still being
+#     sorted out. Switch back to LB-only once the real domain path works.
 
 resource "google_service_account" "portal_runtime" {
   account_id   = "dhg-caretrack-portal"
@@ -31,9 +35,7 @@ resource "google_cloud_run_v2_service" "portal" {
   location = var.region
   project  = var.project_id
 
-  # Only traffic that has already passed through the LB + IAP stack
-  # (terraform/modules/portal-edge) can reach this service.
-  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  ingress = var.ingress
 
   template {
     service_account = google_service_account.portal_runtime.email
@@ -59,8 +61,9 @@ resource "google_cloud_run_v2_service" "portal" {
 }
 
 # Kept for direct CLI/debugging access (e.g. gcloud run services proxy);
-# with ingress now locked to load-balancer-only, browser access goes
-# through the IAP-protected domain instead, set up in portal-edge.
+# only usable while var.ingress = "INGRESS_TRAFFIC_ALL". Once locked to
+# load-balancer-only, browser access goes through the IAP-protected
+# domain instead, set up in portal-edge.
 resource "google_cloud_run_v2_service_iam_member" "clinician_can_invoke" {
   for_each = toset(var.clinician_emails)
 

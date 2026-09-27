@@ -97,6 +97,7 @@ module "clinician_portal" {
   image            = var.portal_image
   bq_dataset       = module.bigquery.dataset_id
   clinician_emails = var.clinician_emails
+  ingress          = var.portal_ingress
 
   depends_on = [module.bigquery]
 }

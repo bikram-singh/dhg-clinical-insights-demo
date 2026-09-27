@@ -84,6 +84,12 @@ variable "portal_subdomain" {
   default     = "dhg-caretrack.gcpcloudhub.in"
 }
 
+variable "portal_ingress" {
+  description = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER (locked to IAP, the real end state) or INGRESS_TRAFFIC_ALL (temporary, for gcloud run services proxy access while gcpcloudhub.in's root DNS is broken)"
+  type        = string
+  default     = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+}
+
 variable "iap_oauth_client_id" {
   description = "OAuth client ID (Web application type) created manually in the console for IAP"
   type        = string

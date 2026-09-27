@@ -20,3 +20,9 @@ variable "clinician_emails" {
   type        = list(string)
   description = "Google account emails allowed to invoke (view) the portal"
 }
+
+variable "ingress" {
+  type        = string
+  default     = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  description = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER (locked to IAP) or INGRESS_TRAFFIC_ALL (temporary, for gcloud run services proxy access while DNS is unresolved)"
+}
