@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
     paths: ["terraform/**"]
+  workflow_dispatch: {}   # lets you manually re-run from the Actions tab,
+                          # without needing a real terraform/** change
 
 permissions:
   contents: read
