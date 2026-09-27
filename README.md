@@ -44,9 +44,11 @@ not validated by any clinician.
    vitals history and risk insight.
 9. A **Partner-Clinic API** (Cloud Run, API-key secured) exposes patient data
    to simulate an external clinic integration.
-10. Everything is deployed via **Terraform** and **GitHub Actions**, monitored
-    via **Cloud Monitoring**, and protected by **Cloud Armor**, **VPC Service
-    Controls**, **Secret Manager**, and **Cloud KMS**.
+10. Deployed via **Terraform**, applied manually today (no CI/CD pipeline
+    yet — see [known-deviations.md](docs/known-deviations.md)). Protected by
+    **Cloud Armor** and **Secret Manager**, both real and deployed. **VPC
+    Service Controls**, **Cloud KMS (CMEK)**, and **Cloud Monitoring**
+    dashboards are part of the original design but not yet built.
 
 ## Architecture
 
