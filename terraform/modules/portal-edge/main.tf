@@ -110,12 +110,29 @@ resource "google_compute_backend_service" "portal" {
   }
 }
 
+resource "random_id" "cert_suffix" {
+  byte_length = 4
+}
+
 resource "google_compute_managed_ssl_certificate" "portal" {
-  name    = "dhg-caretrack-portal-cert"
+  name    = "dhg-caretrack-portal-cert-${random_id.cert_suffix.hex}"
   project = var.project_id
 
   managed {
     domains = [var.subdomain]
+  }
+
+  # Without this, replacing the cert (e.g. after a DNS fix requires a
+  # fresh validation attempt) fails: GCP won't let Terraform delete a
+  # cert that's still attached to the HTTPS proxy below. This makes
+  # Terraform create the new cert and repoint the proxy first, then
+  # delete the old cert last. The random_id suffix in the name is
+  # required alongside this, since GCP won't allow two certs with the
+  # same name to exist even momentarily during the swap - to force a
+  # fresh validation attempt later, taint both this resource and
+  # random_id.cert_suffix together.
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
