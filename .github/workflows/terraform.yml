@@ -1,0 +1,55 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths: ["terraform/**"]
+  push:
+    branches: [main]
+    paths: ["terraform/**"]
+
+permissions:
+  contents: read
+  id-token: write   # required for Workload Identity Federation
+  pull-requests: write
+
+defaults:
+  run:
+    working-directory: terraform/environments/prod
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      # secrets.auto.tfvars is git-ignored and doesn't exist in CI - these
+      # two vars have no default, so they must come from somewhere. Set
+      # them as GitHub repo secrets (Settings -> Secrets and variables ->
+      # Actions) with these exact names.
+      TF_VAR_iap_oauth_client_id: ${{ secrets.TF_VAR_IAP_OAUTH_CLIENT_ID }}
+      TF_VAR_iap_oauth_client_secret: ${{ secrets.TF_VAR_IAP_OAUTH_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init
+        run: terraform init
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color -var-file=terraform.tfvars
+
+      - name: terraform apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve -var-file=terraform.tfvars

@@ -1,0 +1,128 @@
+name: Build and Deploy Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "generator/**"
+      - "portal/backend/**"
+      - "partner-api/backend/**"
+      - "pipeline/risk-insight-processor/**"
+      - "alerting/**"
+
+permissions:
+  contents: read
+  id-token: write   # required for Workload Identity Federation
+
+env:
+  PROJECT_ID: dhg-caretrack
+  REGION: us-central1
+  REPO: apps
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      generator: ${{ steps.filter.outputs.generator }}
+      portal: ${{ steps.filter.outputs.portal }}
+      partner_api: ${{ steps.filter.outputs.partner_api }}
+      risk_processor: ${{ steps.filter.outputs.risk_processor }}
+      alerting: ${{ steps.filter.outputs.alerting }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            generator:
+              - 'generator/**'
+            portal:
+              - 'portal/backend/**'
+            partner_api:
+              - 'partner-api/backend/**'
+            risk_processor:
+              - 'pipeline/risk-insight-processor/**'
+            alerting:
+              - 'alerting/**'
+
+  build-and-deploy:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: generator
+            dir: generator
+            image: generator
+            kind: job
+            resource: dhg-caretrack-generator
+            changed: ${{ needs.changes.outputs.generator }}
+          - name: portal
+            dir: portal/backend
+            image: portal
+            kind: service
+            resource: dhg-caretrack-portal
+            changed: ${{ needs.changes.outputs.portal }}
+          - name: partner-api
+            dir: partner-api/backend
+            image: partner-api
+            kind: service
+            resource: dhg-caretrack-partner-api
+            changed: ${{ needs.changes.outputs.partner_api }}
+          - name: risk-processor
+            dir: pipeline/risk-insight-processor
+            image: risk-processor
+            kind: job
+            resource: dhg-caretrack-risk-processor
+            changed: ${{ needs.changes.outputs.risk_processor }}
+          - name: alerting
+            dir: alerting
+            image: alerting
+            kind: job
+            resource: dhg-caretrack-alerting
+            changed: ${{ needs.changes.outputs.alerting }}
+    steps:
+      - name: Skip if unchanged
+        if: matrix.changed != 'true'
+        run: echo "No changes for ${{ matrix.name }} - skipping" && exit 0
+
+      - uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - id: auth
+        if: matrix.changed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: matrix.changed == 'true'
+
+      - name: Build and push image
+        if: matrix.changed == 'true'
+        working-directory: ${{ matrix.dir }}
+        run: |
+          gcloud builds submit --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:${{ github.sha }} .
+          gcloud builds submit --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:latest .
+
+      - name: Roll out new revision (Cloud Run Job)
+        if: matrix.changed == 'true' && matrix.kind == 'job'
+        run: |
+          gcloud run jobs update ${{ matrix.resource }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:${{ github.sha }} \
+            --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }}
+
+      - name: Roll out new revision (Cloud Run Service)
+        if: matrix.changed == 'true' && matrix.kind == 'service'
+        run: |
+          gcloud run services update ${{ matrix.resource }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:${{ github.sha }} \
+            --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }}
+
+# NOTE: the Dataflow pipeline (pipeline/dataflow-beam/) is NOT covered by
+# this workflow. Rebuilding its Flex Template and rolling out a new
+# Dataflow job version still requires the manual sequence documented in
+# pipeline/dataflow-beam/ - bumping the job's name (v7 -> v8, etc.) is a
+# deliberate Terraform change, not something safe to automate on every
+# push. See docs/known-deviations.md.

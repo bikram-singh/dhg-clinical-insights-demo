@@ -162,3 +162,9 @@ module "pipeline_jobs" {
 
   depends_on = [module.bigquery]
 }
+
+module "github_actions_wif" {
+  source      = "../../modules/github-actions-wif"
+  project_id  = var.project_id
+  github_repo = var.github_repo
+}

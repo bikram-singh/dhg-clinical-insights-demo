@@ -123,3 +123,9 @@ variable "alert_from_email" {
   description = "Sending Gmail address for alerting (must match the OAuth-authorized account in alerting-oauth-token)"
   type        = string
 }
+
+variable "github_repo" {
+  description = "GitHub repo in owner/name form, e.g. bikram-singh/dhg-clinical-insights-demo"
+  type        = string
+  default     = "bikram-singh/dhg-clinical-insights-demo"
+}
