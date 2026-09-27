@@ -58,6 +58,44 @@ component-by-component breakdown.
 See [docs/architecture.md](docs/architecture.md) for the annotated folder
 layout.
 
+## GCP Console verification (screenshots)
+
+[`docs/snapshots/`](docs/snapshots/) holds console screenshots proving each
+piece of the architecture above is real and deployed, organized by area:
+
+- [`data-pipeline/`](docs/snapshots/data-pipeline/) — Dataflow job, Pub/Sub,
+  BigQuery, Healthcare API/FHIR store
+- [`ai-ml/`](docs/snapshots/ai-ml/) — BigQuery ML model training and
+  scoring, Gemini-generated risk explanations
+- [`alerting/`](docs/snapshots/alerting/) — a real high-risk alert email
+  sent by the alerting service
+- [`compute/`](docs/snapshots/compute/) — Cloud Run services/jobs, Cloud
+  Scheduler, Artifact Registry
+- [`networking/`](docs/snapshots/networking/) — VPC, Load Balancer, Cloud
+  DNS, managed SSL certificate
+- [`security-governance/`](docs/snapshots/security-governance/) — IAM,
+  Dataplex/Data Catalog policy tags, Cloud Audit Logs, Cloud Armor, IAP,
+  Secret Manager
+- [`portal-access-demo/`](docs/snapshots/portal-access-demo/) — the
+  Clinician Portal's patient list/detail pages and the real IAP sign-in flow
+- [`oauth-setup/`](docs/snapshots/oauth-setup/) — the OAuth consent screen
+  and client configuration steps needed for the alerting service and IAP
+- [`billing-and-registry/`](docs/snapshots/billing-and-registry/) — billing
+  account linkage and GCS bucket setup
+
+Where the same resource was captured more than once across the build (e.g.
+an earlier Dataflow job version, superseded once the pipeline was fixed and
+redeployed), only the most current/complete screenshot is kept.
+
+**A note on what's deliberately excluded:** a couple of screenshots from the
+original build session showed live OAuth client secrets in plaintext (Google
+only displays a client secret once, at creation) — these are excluded from
+this folder and were never committed, since publishing a real credential in
+a public repo would be a genuine security exposure regardless of the fact
+that it's a demo project. If you're the one who ran this build, treat any
+OAuth client secret that appeared on-screen during setup as compromised and
+rotate it in the Google Cloud Console (APIs & Services → Credentials).
+
 ## Known deviations
 
 See [docs/known-deviations.md](docs/known-deviations.md) for anything built
