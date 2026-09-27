@@ -17,3 +17,6 @@ clinician_emails = ["admin@gcpcloudhub.in"]
 # DNS is actually fixed.
 portal_ingress = "INGRESS_TRAFFIC_ALL"
 partner_api_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/partner-api:latest"
+risk_processor_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/risk-processor:latest"
+alerting_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/alerting:latest"
+alert_from_email = "bikram23march@gmail.com"

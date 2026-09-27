@@ -55,6 +55,15 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CREDENTIALS_PATH = os.path.join(THIS_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(THIS_DIR, "token.json")
 
+# When running unattended (Cloud Run Job), there's no browser for the
+# interactive consent flow, and no persistent disk between executions to
+# cache token.json on. Set this env var to a Secret Manager secret version
+# name and the cached OAuth token is fetched from there instead - see
+# docs/known-deviations.md for the caveat this doesn't remove (Testing-mode
+# OAuth consent screens issue refresh tokens that Google can expire after
+# 7 days of inactivity).
+TOKEN_SECRET_NAME = os.environ.get("TOKEN_SECRET_NAME")
+
 # Colors for each risk_level, used in the HTML email.
 RISK_LEVEL_COLORS = {
     "high": "#c0392b",     # red
@@ -64,6 +73,13 @@ RISK_LEVEL_COLORS = {
 
 
 def get_gmail_credentials():
+    if TOKEN_SECRET_NAME and not os.path.exists(TOKEN_PATH):
+        from google.cloud import secretmanager
+        secret_client = secretmanager.SecretManagerServiceClient()
+        response = secret_client.access_secret_version(name=TOKEN_SECRET_NAME)
+        with open(TOKEN_PATH, "wb") as f:
+            f.write(response.payload.data)
+
     creds = None
     if os.path.exists(TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
@@ -82,6 +98,10 @@ def get_gmail_credentials():
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
 
+        # Written locally only - when TOKEN_SECRET_NAME is set, this is a
+        # throwaway copy for this execution; it is never written back to
+        # Secret Manager, since the refresh_token itself doesn't change on
+        # a routine refresh.
         with open(TOKEN_PATH, "w") as f:
             f.write(creds.to_json())
 

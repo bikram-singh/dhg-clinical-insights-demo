@@ -47,6 +47,8 @@ module "data_governance" {
   reader_members = [
     "user:${var.clinician_emails[0]}",
     "serviceAccount:dhg-caretrack-portal@${var.project_id}.iam.gserviceaccount.com",
+    "serviceAccount:dhg-caretrack-riskproc@${var.project_id}.iam.gserviceaccount.com",
+    "serviceAccount:dhg-caretrack-alerting@${var.project_id}.iam.gserviceaccount.com",
   ]
 }
 
@@ -143,6 +145,20 @@ module "partner_api" {
   image            = var.partner_api_image
   bq_dataset       = module.bigquery.dataset_id
   clinician_emails = var.clinician_emails
+
+  depends_on = [module.bigquery]
+}
+
+module "pipeline_jobs" {
+  source                = "../../modules/pipeline-jobs"
+  project_id            = var.project_id
+  project_number        = data.google_project.current.number
+  region                = var.dataflow_region
+  bq_dataset            = module.bigquery.dataset_id
+  risk_processor_image  = var.risk_processor_image
+  alerting_image        = var.alerting_image
+  alert_from_email      = var.alert_from_email
+  alert_to_email        = var.clinician_emails[0]
 
   depends_on = [module.bigquery]
 }

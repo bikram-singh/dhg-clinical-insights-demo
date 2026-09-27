@@ -106,3 +106,20 @@ variable "partner_api_image" {
   type        = string
   default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/partner-api:latest"
 }
+
+variable "risk_processor_image" {
+  description = "Full Artifact Registry image path for the risk-insight-processor container"
+  type        = string
+  default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/risk-processor:latest"
+}
+
+variable "alerting_image" {
+  description = "Full Artifact Registry image path for the alerting container"
+  type        = string
+  default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/alerting:latest"
+}
+
+variable "alert_from_email" {
+  description = "Sending Gmail address for alerting (must match the OAuth-authorized account in alerting-oauth-token)"
+  type        = string
+}
