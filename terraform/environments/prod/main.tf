@@ -14,9 +14,14 @@ terraform {
       version = "~> 3.6"
     }
   }
-  # Configure your HCP Terraform / GCS backend here, matching your
-  # existing gcp-hcp-terraform workspace pattern.
-  # backend "remote" { ... }
+  # Shared state backend - both your local machine and GitHub Actions CI
+  # read/write the SAME state here, instead of each having their own
+  # private local state (which is what caused CI to try creating all 87
+  # resources from scratch the first time it ran).
+  backend "gcs" {
+    bucket = "dhg-caretrack-tfstate"
+    prefix = "prod"
+  }
 }
 
 provider "google" {
