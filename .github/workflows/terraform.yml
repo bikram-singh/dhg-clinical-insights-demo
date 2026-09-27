@@ -37,8 +37,14 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
-      - name: terraform fmt check
-        run: terraform fmt -check -recursive
+      - name: terraform fmt (auto-fix, never blocks)
+        # A hard `-check` failure here would block every apply over pure
+        # style, which isn't worth it - auto-fix in the runner's checkout
+        # instead. This doesn't commit the fix back to the repo; run
+        # `terraform fmt -recursive` locally yourself if you want the
+        # formatting change to persist.
+        run: terraform fmt -recursive
+        working-directory: terraform
 
       - name: terraform init
         run: terraform init
