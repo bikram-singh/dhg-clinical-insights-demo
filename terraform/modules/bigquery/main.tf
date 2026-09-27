@@ -41,7 +41,9 @@ resource "google_bigquery_table" "diagnostic_reports" {
   table_id   = "diagnostic_reports"
   labels     = var.labels
 
-  schema = file("${path.module}/schemas/diagnostic_reports.json")
+  schema = templatefile("${path.module}/schemas/diagnostic_reports.json.tpl", {
+    policy_tag_name = var.sensitive_policy_tag_name
+  })
 }
 
 resource "google_bigquery_table" "risk_assessments" {
@@ -50,7 +52,9 @@ resource "google_bigquery_table" "risk_assessments" {
   table_id   = "risk_assessments"
   labels     = var.labels
 
-  schema = file("${path.module}/schemas/risk_assessments.json")
+  schema = templatefile("${path.module}/schemas/risk_assessments.json.tpl", {
+    policy_tag_name = var.sensitive_policy_tag_name
+  })
 }
 
 # Data Access audit logging is enabled at the project level via the

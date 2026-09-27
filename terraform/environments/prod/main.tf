@@ -40,12 +40,28 @@ module "pubsub" {
   labels     = var.labels
 }
 
-module "bigquery" {
-  source     = "../../modules/bigquery"
+module "data_governance" {
+  source     = "../../modules/data-governance"
   project_id = var.project_id
-  dataset_id = var.dataset_id
   region     = var.region
-  labels     = var.labels
+  reader_members = [
+    "user:${var.clinician_emails[0]}",
+    "serviceAccount:dhg-caretrack-portal@${var.project_id}.iam.gserviceaccount.com",
+  ]
+}
+
+module "audit_logging" {
+  source     = "../../modules/audit-logging"
+  project_id = var.project_id
+}
+
+module "bigquery" {
+  source                    = "../../modules/bigquery"
+  project_id                = var.project_id
+  dataset_id                = var.dataset_id
+  region                    = var.region
+  labels                    = var.labels
+  sensitive_policy_tag_name = module.data_governance.policy_tag_name
 }
 
 module "healthcare_api" {
