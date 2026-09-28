@@ -31,7 +31,10 @@ Cloud Armor), so it is private by design.
 - **"updating" marker.** A risk badge marked "updating" means the assessment
   was computed before that patient's newest reading arrived (the scorer runs a
   few minutes after each ingest), so the vitals and the risk shown can briefly
-  disagree.
+  disagree. Those rows get a faded risk badge and an amber "updating" pill.
+  The "high risk now" card counts each patient's latest assessment, so it can
+  lag by the same few minutes. If most rows stay "updating" long after a
+  reading arrived, the scorer is running late - check the risk-processor job.
 
 ## Data sources
 
