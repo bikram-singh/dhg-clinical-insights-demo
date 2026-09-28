@@ -2,105 +2,202 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="refresh" content="300">
   <title>DHG CareTrack — Analytics</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f5f6f8; margin: 0; padding: 24px; color: #222; }
-    .banner {
-      background: #fdecea; color: #c0392b; padding: 10px 16px; border-radius: 6px;
-      font-weight: bold; margin-bottom: 20px; font-size: 14px;
+    :root {
+      --navy: #0f2a43; --ink: #1e293b; --muted: #64748b; --line: #e2e8f0; --bg: #eef2f7;
+      --red: {{ risk_colors.high }}; --amber: {{ risk_colors.medium }}; --green: {{ risk_colors.low }};
     }
-    h1 { font-size: 22px; margin: 0 0 4px 0; }
-    .sub { color: #777; font-size: 13px; margin-bottom: 20px; }
-    a.nav { color: #2c3e50; font-weight: bold; text-decoration: none; font-size: 14px; }
-    a.nav:hover { text-decoration: underline; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", -apple-system, Roboto, Arial, sans-serif; background: var(--bg);
+           margin: 0; padding: 0 24px 28px; color: var(--ink); }
+
+    /* accent palettes: --accent is the strong colour, --tint its soft background */
+    .a-indigo { --accent: #4f46e5; --tint: #eef2ff; }
+    .a-blue   { --accent: #2563eb; --tint: #eff6ff; }
+    .a-teal   { --accent: #0d9488; --tint: #f0fdfa; }
+    .a-violet { --accent: #7c3aed; --tint: #f5f3ff; }
+    .a-amber  { --accent: #d97706; --tint: #fffbeb; }
+    .a-red    { --accent: var(--red); --tint: #fdecea; }
+    .a-green  { --accent: var(--green); --tint: #ecf8f0; }
+    .a-navy   { --accent: var(--navy); --tint: #e8eef5; }
+
+    .banner { background: #fdecea; color: var(--red); padding: 9px 16px; border-radius: 0 0 10px 10px;
+              font-weight: 700; font-size: 13px; text-align: center; margin: 0 auto 18px; max-width: 1100px; }
+
+    .hero { background: linear-gradient(115deg, #0f2a43 0%, #1d4e89 55%, #0d9488 100%); color: #fff;
+            border-radius: 16px; padding: 22px 26px; margin-bottom: 18px;
+            box-shadow: 0 6px 20px rgba(15, 42, 67, 0.25); }
+    .hero h1 { font-size: 26px; margin: 8px 0 4px; letter-spacing: 0.2px; }
+    .hero .sub { color: #cfe3f5; font-size: 13px; }
+    .hero a.back { display: inline-block; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600;
+                   background: rgba(255,255,255,0.16); padding: 5px 12px; border-radius: 999px; }
+    .hero a.back:hover { background: rgba(255,255,255,0.28); }
+
     .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 18px; }
-    .kpi { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .kpi .label { font-size: 12px; text-transform: uppercase; color: #777; }
-    .kpi .value { font-size: 30px; font-weight: bold; margin-top: 6px; }
-    .kpi .unit { font-size: 14px; color: #777; font-weight: normal; }
+    .kpi { background: #fff; border-radius: 14px; padding: 15px 16px; display: flex; gap: 12px; align-items: center;
+           border-top: 4px solid var(--accent);
+           box-shadow: 0 1px 2px rgba(15,42,67,.06), 0 4px 14px rgba(15,42,67,.07); }
+    .kpi.tinted { background: var(--tint); }
+    .kpi .icon { flex: none; width: 42px; height: 42px; border-radius: 12px; background: var(--tint);
+                 color: var(--accent); display: flex; align-items: center; justify-content: center; }
+    .kpi.tinted .icon { background: #fff; }
+    .kpi .icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2;
+                     stroke-linecap: round; stroke-linejoin: round; }
+    .kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; }
+    .kpi .value { font-size: 30px; font-weight: 800; color: var(--accent); line-height: 1.15; }
+    .kpi .unit { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .kpi .note { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 18px; }
-    .card { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .card h2 { font-size: 15px; margin: 0 0 10px 0; }
+    .card { background: #fff; border-radius: 14px; padding: 16px 18px;
+            box-shadow: 0 1px 2px rgba(15,42,67,.06), 0 4px 14px rgba(15,42,67,.07); }
+    .card h2 { font-size: 15px; margin: 0 0 12px; padding-left: 10px; border-left: 4px solid var(--accent); }
     .chart-box { position: relative; height: 260px; }
-    .empty { color: #999; font-size: 13px; padding: 40px 0; text-align: center; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
-    th { background: #fafafa; font-size: 12px; text-transform: uppercase; color: #777; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
-    .pending { color: #999; font-size: 11px; margin-left: 6px; font-style: italic; }
-    .foot { color: #999; font-size: 12px; margin-top: 14px; }
-    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+    .empty { color: #94a3b8; font-size: 13px; padding: 40px 0; text-align: center; }
+
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    thead th { background: var(--navy); color: #fff; text-align: left; padding: 11px 14px; font-size: 12px;
+               text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    thead th:first-child { border-top-left-radius: 10px; }
+    thead th:last-child  { border-top-right-radius: 10px; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody tr:hover { background: #eaf2ff; }
+    tbody tr.row-high { background: #fdecea; box-shadow: inset 4px 0 0 var(--red); }
+    tbody tr.row-high:hover { background: #fbdcd8; }
+    td.abn { color: var(--red); font-weight: 700; background: rgba(192, 57, 43, 0.09); }
+    a.nav { color: var(--navy); font-weight: 700; text-decoration: none; }
+    a.nav:hover { text-decoration: underline; }
+
+    .badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11px; font-weight: 800;
+             color: #fff; letter-spacing: 0.4px; }
+    .pending { color: #64748b; font-size: 11px; margin-left: 6px; font-style: italic; background: #e2e8f0;
+               padding: 1px 7px; border-radius: 999px; }
+    .scorebar { display: inline-block; width: 70px; height: 8px; background: var(--line); border-radius: 999px;
+                overflow: hidden; vertical-align: middle; margin-right: 8px; }
+    .scorebar span { display: block; height: 100%; border-radius: 999px; }
+    .foot { color: #94a3b8; font-size: 12px; margin-top: 14px; line-height: 1.5; }
+    .foot b { color: var(--red); }
+
+    @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px)  { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="banner">*** DEMONSTRATION - SYNTHETIC DATA ONLY. No real patient is involved. Not a medical diagnosis. ***</div>
-  <a class="nav" href="/">&larr; Patient list</a>
-  <h1>DHG CareTrack — Analytics</h1>
-  <div class="sub">Population view across all patients. Times are UTC.</div>
 
+  <div class="hero">
+    <a class="back" href="/">&larr; Patient list</a>
+    <h1>DHG CareTrack — Analytics</h1>
+    <div class="sub">Population view across all patients &middot; times are UTC</div>
+  </div>
+
+  {% set fresh_class = {'ok': 'a-green', 'warn': 'a-amber', 'bad': 'a-red'}[kpis.freshness] %}
+  {% set fresh_note = {'ok': 'pipeline healthy', 'warn': 'slightly behind', 'bad': 'check the pipeline'}[kpis.freshness] %}
   <div class="kpis">
-    <div class="kpi"><div class="label">Patients monitored</div><div class="value">{{ kpis.patients }}</div></div>
-    <div class="kpi"><div class="label">High risk now</div>
-      <div class="value" style="color: {{ risk_colors.high }};">{{ kpis.high_risk }}</div></div>
-    <div class="kpi"><div class="label">High-risk assessments (24 h)</div>
-      <div class="value">{{ kpis.high_24h }}</div></div>
-    <div class="kpi"><div class="label">Avg heart rate</div>
-      <div class="value">{{ kpis.avg_hr if kpis.avg_hr is not none else "—" }} <span class="unit">bpm</span></div></div>
-    <div class="kpi"><div class="label">Avg SpO2</div>
-      <div class="value">{{ kpis.avg_spo2 if kpis.avg_spo2 is not none else "—" }} <span class="unit">%</span></div></div>
-    <div class="kpi"><div class="label">Newest reading</div>
-      <div class="value">{{ kpis.freshest_min if kpis.freshest_min is not none else "—" }} <span class="unit">min ago</span></div></div>
+    <div class="kpi a-indigo">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div><div class="label">Patients monitored</div><div class="value">{{ kpis.patients }}</div>
+        <div class="note">synthetic cohort</div></div>
+    </div>
+    <div class="kpi tinted {{ 'a-red' if kpis.high_risk > 0 else 'a-green' }}">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div><div class="label">High risk now</div><div class="value">{{ kpis.high_risk }}</div>
+        <div class="note">{{ 'of ' ~ kpis.patients ~ ' patients' if kpis.high_risk > 0 else 'all clear' }}</div></div>
+    </div>
+    <div class="kpi a-amber">
+      <div class="icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div><div class="label">High-risk (24 h)</div><div class="value">{{ kpis.high_24h }}</div>
+        <div class="note">assessments flagged</div></div>
+    </div>
+    <div class="kpi a-blue">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+      <div><div class="label">Avg heart rate</div>
+        <div class="value">{{ kpis.avg_hr if kpis.avg_hr is not none else "—" }} <span class="unit">bpm</span></div>
+        <div class="note">flags at &ge; {{ thresholds.heart_rate }}</div></div>
+    </div>
+    <div class="kpi a-teal">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></div>
+      <div><div class="label">Avg SpO2</div>
+        <div class="value">{{ kpis.avg_spo2 if kpis.avg_spo2 is not none else "—" }} <span class="unit">%</span></div>
+        <div class="note">flags at &le; {{ thresholds.spo2 }}</div></div>
+    </div>
+    <div class="kpi {{ fresh_class }}">
+      <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div><div class="label">Newest reading</div>
+        <div class="value">{{ kpis.freshest_min if kpis.freshest_min is not none else "—" }} <span class="unit">min ago</span></div>
+        <div class="note">{{ fresh_note }}</div></div>
+    </div>
   </div>
 
   <div class="grid">
-    <div class="card"><h2>Risk level split (latest assessment per patient)</h2>
+    <div class="card a-indigo"><h2>Risk level split (latest assessment per patient)</h2>
       <div class="chart-box"><canvas id="riskSplit"></canvas></div></div>
-    <div class="card"><h2>Average vitals by hour (last 24 h)</h2>
+    <div class="card a-blue"><h2>Average vitals by hour (last 24 h)</h2>
       <div class="chart-box"><canvas id="vitals"></canvas></div></div>
-    <div class="card"><h2>Risk assessments per hour, by level (last 24 h)</h2>
+    <div class="card a-amber"><h2>Risk assessments per hour, by level (last 24 h)</h2>
       <div class="chart-box"><canvas id="riskByHour"></canvas></div></div>
-    <div class="card"><h2>Readings ingested per 15 minutes (last 6 h)</h2>
+    <div class="card a-teal"><h2>Readings ingested per 15 minutes (last 6 h)</h2>
       <div class="chart-box"><canvas id="ingestion"></canvas></div></div>
   </div>
 
-  <div class="card">
+  <div class="card a-navy">
     <h2>Patients, highest risk first</h2>
     <table>
-      <tr>
-        <th>Patient</th><th>Risk</th><th>Score</th><th>BP</th>
-        <th>Heart rate</th><th>SpO2</th><th>Last reading</th>
-      </tr>
+      <thead>
+        <tr>
+          <th>Patient</th><th>Risk</th><th>Score</th><th>BP</th>
+          <th>Heart rate</th><th>SpO2</th><th>Last reading</th>
+        </tr>
+      </thead>
+      <tbody>
       {% for p in patients %}
-      <tr>
+      {% set bp_bad  = p.bp_systolic is not none and p.bp_systolic >= thresholds.bp_systolic %}
+      {% set hr_bad  = p.heart_rate is not none and p.heart_rate >= thresholds.heart_rate %}
+      {% set spo_bad = p.spo2 is not none and p.spo2 <= thresholds.spo2 %}
+      <tr class="{{ 'row-high' if p.risk_level == 'high' else '' }}">
         <td><a class="nav" href="/patient/{{ p.patient_id }}">{{ p.patient_id }}</a></td>
         <td>
           {% if p.risk_level %}
             <span class="badge" style="background: {{ risk_colors.get(p.risk_level, '#888') }};">{{ p.risk_level.upper() }}</span>
             {% if p.assessment_pending %}<span class="pending" title="Risk was computed before this patient's newest reading arrived">updating</span>{% endif %}
-          {% else %}<span style="color:#999;">not yet assessed</span>{% endif %}
+          {% else %}<span style="color:#94a3b8;">not yet assessed</span>{% endif %}
         </td>
-        <td>{{ "%.2f"|format(p.ml_risk_score) if p.ml_risk_score is not none else "—" }}</td>
-        <td>{{ p.bp }}</td>
-        <td>{{ "%.0f"|format(p.heart_rate) if p.heart_rate is not none else "—" }}</td>
-        <td>{{ "%.1f"|format(p.spo2) if p.spo2 is not none else "—" }}</td>
+        <td>
+          {% if p.ml_risk_score is not none %}
+            <span class="scorebar"><span style="width: {{ (p.ml_risk_score * 100) | round(0) | int }}%; background: {{ risk_colors.get(p.risk_level, '#888') }};"></span></span>{{ "%.2f"|format(p.ml_risk_score) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="{{ 'abn' if bp_bad else '' }}">{{ p.bp }}</td>
+        <td class="{{ 'abn' if hr_bad else '' }}">{{ "%.0f"|format(p.heart_rate) if p.heart_rate is not none else "—" }}</td>
+        <td class="{{ 'abn' if spo_bad else '' }}">{{ "%.1f"|format(p.spo2) if p.spo2 is not none else "—" }}</td>
         <td>{{ p.last_reading_label }}</td>
       </tr>
       {% endfor %}
+      </tbody>
     </table>
   </div>
 
   <div class="foot">
-    Source: the dashboard_* BigQuery views, which never include the Gemini explanation text
-    or diagnostic report text. "Updating" means the risk shown was computed before that patient's newest reading arrived (the scorer runs a few minutes after each ingest). Results are cached for 60 seconds; the page refreshes every 5 minutes.
+    <b>Red values</b> cross the synthetic rule the demo risk model was trained on
+    (systolic BP &ge; {{ thresholds.bp_systolic }}, heart rate &ge; {{ thresholds.heart_rate }},
+    SpO2 &le; {{ thresholds.spo2 }}). &ldquo;Updating&rdquo; means the risk shown was computed before that
+    patient's newest reading arrived (the scorer runs a few minutes after each ingest).<br>
+    Source: the dashboard_* BigQuery views, which never include the Gemini explanation text or diagnostic report text.
+    Results are cached for 60 seconds; the page refreshes every 5 minutes.
   </div>
 
   <script>
     const charts = {{ charts | tojson }};
+    Chart.defaults.font.family = '"Segoe UI", -apple-system, Roboto, Arial, sans-serif';
+    Chart.defaults.color = '#475569';
+    const legend = { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } };
     const noData = (id) => {
-      const box = document.getElementById(id).parentElement;
-      box.innerHTML = '<div class="empty">No data in this window yet.</div>';
+      document.getElementById(id).parentElement.innerHTML = '<div class="empty">No data in this window yet.</div>';
     };
 
     if (charts.risk_split.values.some(v => v > 0)) {
@@ -108,24 +205,29 @@
         type: 'doughnut',
         data: {
           labels: charts.risk_split.labels.map(l => l.toUpperCase()),
-          datasets: [{ data: charts.risk_split.values, backgroundColor: charts.risk_split.colors }]
+          datasets: [{ data: charts.risk_split.values, backgroundColor: charts.risk_split.colors,
+                       borderColor: '#fff', borderWidth: 3, hoverOffset: 6 }]
         },
-        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: { maintainAspectRatio: false, cutout: '62%', plugins: { legend } }
       });
     } else { noData('riskSplit'); }
 
     if (charts.vitals.labels.length) {
+      const line = (label, data, color) => ({ label, data, borderColor: color, backgroundColor: color,
+                                              borderWidth: 2.5, tension: 0.35, pointRadius: 2.5, pointHoverRadius: 5 });
       new Chart(document.getElementById('vitals'), {
         type: 'line',
         data: {
           labels: charts.vitals.labels,
           datasets: [
-            { label: 'Heart rate (bpm)', data: charts.vitals.heart_rate, borderColor: '#2980b9', tension: 0.3 },
-            { label: 'BP systolic', data: charts.vitals.bp_systolic, borderColor: '#c0392b', tension: 0.3 },
-            { label: 'SpO2 (%)', data: charts.vitals.spo2, borderColor: '#1e8449', tension: 0.3 }
+            line('Heart rate (bpm)', charts.vitals.heart_rate, '#2563eb'),
+            line('BP systolic', charts.vitals.bp_systolic, '#7c3aed'),
+            line('SpO2 (%)', charts.vitals.spo2, '#0d9488')
           ]
         },
-        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                   scales: { y: { grid: { color: '#eef2f7' } }, x: { grid: { display: false } } },
+                   plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyleWidth: 9, boxHeight: 7, padding: 16 } } } }
       });
     } else { noData('vitals'); }
 
@@ -140,8 +242,9 @@
         },
         options: {
           maintainAspectRatio: false,
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-          plugins: { legend: { position: 'bottom' } }
+          scales: { x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, grid: { color: '#eef2f7' } } },
+          plugins: { legend }
         }
       });
     } else { noData('riskByHour'); }
@@ -151,9 +254,12 @@
         type: 'bar',
         data: {
           labels: charts.ingestion.labels,
-          datasets: [{ label: 'Readings', data: charts.ingestion.values, backgroundColor: '#5d6d7e' }]
+          datasets: [{ label: 'Readings', data: charts.ingestion.values,
+                       backgroundColor: '#0d9488', borderRadius: 4, borderSkipped: false }]
         },
-        options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        options: { maintainAspectRatio: false,
+                   scales: { y: { beginAtZero: true, grid: { color: '#eef2f7' } }, x: { grid: { display: false } } },
+                   plugins: { legend: { display: false } } }
       });
     } else { noData('ingestion'); }
   </script>

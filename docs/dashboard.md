@@ -20,6 +20,14 @@ Cloud Armor), so it is private by design.
   and pipeline running without gaps.
 - **Patient table,** highest risk first, with blood pressure, heart rate,
   SpO2 and last reading; each patient links to their detail page.
+- **Colour carries meaning.** Red / amber / green are reserved for risk level
+  (and match the alert email). The "high risk now" card turns red when any
+  patient is high and green when none are. The "newest reading" card is green
+  up to 20 minutes, amber up to 45, then red, so it doubles as a pipeline
+  health light. Vitals use blue / violet / teal so they are never mistaken for
+  risk. In the patient table, high-risk rows are tinted red, and any value that
+  crosses the synthetic rule the demo model was trained on (systolic BP >= 145,
+  heart rate >= 100, SpO2 <= 94) is marked in red.
 - **"updating" marker.** A risk badge marked "updating" means the assessment
   was computed before that patient's newest reading arrived (the scorer runs a
   few minutes after each ingest), so the vitals and the risk shown can briefly

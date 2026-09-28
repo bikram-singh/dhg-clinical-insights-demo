@@ -34,6 +34,11 @@ bq_client = bigquery.Client(project=PROJECT_ID)
 
 RISK_COLORS = {"high": "#c0392b", "medium": "#d68910", "low": "#1e8449"}
 
+# The rule the synthetic risk label is derived from
+# (sql/views/observations_wide_labeled.sql). Used only to highlight values on
+# the analytics page - it does not compute risk.
+RISK_THRESHOLDS = {"bp_systolic": 145, "heart_rate": 100, "spo2": 94}
+
 
 def fetch_patient_list():
     query = f"""
@@ -186,6 +191,14 @@ def _hour_labels(stamps):
     return labels
 
 
+def _freshness(minutes):
+    """Pipeline health from the age of the newest reading. The generator runs
+    every 15 minutes, so up to ~20 is healthy."""
+    if minutes is None:
+        return "bad"
+    return "ok" if minutes <= 20 else "warn" if minutes <= 45 else "bad"
+
+
 def _r(value, digits=1):
     return round(value, digits) if value is not None else None
 
@@ -211,6 +224,7 @@ def build_analytics_context():
         "avg_hr": _r(_avg(snapshot, "heart_rate")),
         "avg_spo2": _r(_avg(snapshot, "spo2")),
         "freshest_min": min(ages) if ages else None,
+        "freshness": _freshness(min(ages) if ages else None),
     }
 
     patients = []
@@ -261,7 +275,13 @@ def build_analytics_context():
             "values": [i["readings"] for i in ingestion],
         },
     }
-    return {"kpis": kpis, "patients": patients, "charts": charts, "risk_colors": RISK_COLORS}
+    return {
+        "kpis": kpis,
+        "patients": patients,
+        "charts": charts,
+        "risk_colors": RISK_COLORS,
+        "thresholds": RISK_THRESHOLDS,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
