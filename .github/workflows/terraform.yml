@@ -1,13 +1,23 @@
 name: Terraform
 
+# Pushes and PRs only PLAN. Applying is a deliberate manual step
+# (Actions -> Terraform -> Run workflow), and even then it refuses to
+# apply a plan that deletes or replaces anything unless you explicitly
+# tick "allow_destroy". This exists because an earlier auto-apply-on-push
+# setup, fed a partial commit, tried to delete live resources that were in
+# state but missing from the pushed code.
 on:
   pull_request:
     paths: ["terraform/**"]
   push:
     branches: [main]
     paths: ["terraform/**"]
-  workflow_dispatch: {}   # lets you manually re-run from the Actions tab,
-                          # without needing a real terraform/** change
+  workflow_dispatch:
+    inputs:
+      allow_destroy:
+        description: "Apply even if the plan deletes or replaces resources"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,7 +50,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - name: terraform fmt (auto-fix, never blocks)
-        # A hard `-check` failure here would block every apply over pure
+        # A hard `-check` failure here would block every run over pure
         # style, which isn't worth it - auto-fix in the runner's checkout
         # instead. This doesn't commit the fix back to the repo; run
         # `terraform fmt -recursive` locally yourself if you want the
@@ -55,9 +65,31 @@ jobs:
         run: terraform validate
 
       - name: terraform plan
-        if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -var-file=terraform.tfvars
+        run: terraform plan -no-color -var-file=terraform.tfvars -out=tfplan
+
+      - name: count deletes/replacements in the plan
+        id: guard
+        run: |
+          DESTROYS=$(terraform show -json tfplan | jq '[.resource_changes[]? | select(.change.actions | index("delete"))] | length')
+          echo "destroys=$DESTROYS" >> "$GITHUB_OUTPUT"
+          if [ "$DESTROYS" != "0" ]; then
+            echo "::warning::Plan deletes or replaces $DESTROYS resource(s). Review the plan step above before applying."
+          fi
 
       - name: terraform apply
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: terraform apply -auto-approve -var-file=terraform.tfvars
+        # Manual runs on main only, and only if the plan is destroy-free
+        # (or you explicitly opted in). Applies the exact plan reviewed above.
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main' &&
+          (steps.guard.outputs.destroys == '0' || inputs.allow_destroy == true)
+        run: terraform apply -auto-approve tfplan
+
+      - name: apply skipped - plan contains destroys
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          steps.guard.outputs.destroys != '0' &&
+          inputs.allow_destroy != true
+        run: |
+          echo "::error::Refusing to apply: the plan deletes or replaces ${{ steps.guard.outputs.destroys }} resource(s). Re-run with allow_destroy ticked only if that is intended."
+          exit 1
