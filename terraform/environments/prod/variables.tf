@@ -119,6 +119,11 @@ variable "alerting_image" {
   default     = "us-central1-docker.pkg.dev/REPLACE_ME/apps/alerting:latest"
 }
 
+variable "notification_email" {
+  description = "Mailbox that receives alert emails (high-risk alerts and Cloud Monitoring job-error alerts). Must be a real, mail-capable address. Deliberately separate from clinician_emails, which are Google sign-in identities for IAM/IAP and may have no mailbox at all."
+  type        = string
+}
+
 variable "alert_from_email" {
   description = "Sending Gmail address for alerting (must match the OAuth-authorized account in alerting-oauth-token)"
   type        = string

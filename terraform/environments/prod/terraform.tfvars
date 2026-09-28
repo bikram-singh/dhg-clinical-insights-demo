@@ -20,3 +20,4 @@ partner_api_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/partner-api:l
 risk_processor_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/risk-processor:latest"
 alerting_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/alerting:latest"
 alert_from_email = "bikram23march@gmail.com"
+notification_email = "bikram23march@gmail.com"

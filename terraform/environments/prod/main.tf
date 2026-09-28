@@ -164,7 +164,7 @@ module "pipeline_jobs" {
   risk_processor_image  = var.risk_processor_image
   alerting_image        = var.alerting_image
   alert_from_email      = var.alert_from_email
-  alert_to_email        = var.clinician_emails[0]
+  alert_to_email        = var.notification_email
 
   depends_on = [module.bigquery]
 }
@@ -185,5 +185,5 @@ module "security_kms" {
 module "monitoring" {
   source       = "../../modules/monitoring"
   project_id   = var.project_id
-  notify_email = var.clinician_emails[0]
+  notify_email = var.notification_email
 }
