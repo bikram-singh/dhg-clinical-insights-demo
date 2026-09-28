@@ -114,9 +114,10 @@ exactly what's real, what's approximated, and what's still open.
   valid MX record and a working sign-in do not mean an address can
   receive mail - send a test message before wiring an alert to it.
 - **Alert volume is not yet controlled.** The alerting job runs every 15
-  minutes with a 1-hour lookback, and nearly every synthetic patient
-  scores as high risk, so once delivery works the same assessments are
-  re-sent across overlapping runs (roughly 4 emails an hour). Alerting
+  minutes with a 1-hour lookback, and roughly one assessment in six is
+  high risk, so an hour's window can list around nine of them, with the
+  same ones re-sent across overlapping runs (up to about 4 emails an
+  hour). Alerting
   only on assessments not already reported, or sending a digest, is not
   implemented yet.
 

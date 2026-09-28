@@ -92,7 +92,8 @@ piece of the architecture above is real and deployed, organized by area:
   GitHub Actions authenticates through, its provider's repo-only condition,
   and the versioned GCS bucket that holds the shared Terraform state
 - [`portal-access-demo/`](docs/snapshots/portal-access-demo/) — the
-  Clinician Portal's patient list/detail pages and the real IAP sign-in flow
+  Clinician Portal's patient list, patient detail and analytics pages, and
+  the real IAP sign-in flow
 - [`oauth-setup/`](docs/snapshots/oauth-setup/) — the OAuth consent screen
   and client configuration steps needed for the alerting service and IAP
 - [`billing-and-registry/`](docs/snapshots/billing-and-registry/) — billing

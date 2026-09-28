@@ -127,10 +127,11 @@ it and choose "Make report-level" so it appears on all pages at once.
 
 ## Known limitations
 
-- The dashboard shows whatever the synthetic data does. Because the
-  rule-derived risk label flags any of three thresholds, most patients
-  score as high risk, which makes the risk charts look flatter and more
-  alarming than a realistic population would.
+- The dashboard shows whatever the synthetic data does. Roughly 10-20% of
+  risk assessments come out high (the rule-derived label fires when any of
+  three thresholds is crossed), so at any given moment the per-patient
+  snapshot can be entirely low risk with zero high-risk patients. The
+  assessments-per-hour chart is where the high-risk share is visible.
 - A "SYNTHETIC DATA - demonstration only" banner is added to every page,
   matching the portal.
 
