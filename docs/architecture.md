@@ -28,15 +28,16 @@
                                       for BigQuery, Healthcare API, DLP
                                           |
                                           v
-                          [risk-insight-processor]  (run manually/on demand,
-                          (pipeline/risk-insight-processor/)  not yet scheduled)
+                          [risk-insight-processor]  (Cloud Run Job, scheduled
+                          (pipeline/risk-insight-processor/)  :05/:20/:35/:50)
                              BigQuery ML  --> numeric ml_risk_score
                              Gemini (Vertex AI) --> plain-language explanation
                                           |
                                           v
                                  [risk_assessments table]
                                           |
-                                          |---> [alerting/] run manually,
+                                          |---> [alerting/] Cloud Run Job,
+                                          |      scheduled :10/:25/:40/:55;
                                           |      emails clinician on high risk
                                           |      via Gmail API (OAuth), HTML,
                                           |      color-coded by risk level
@@ -45,9 +46,10 @@
    |                                                     |
 [Clinician Portal]                              [Partner-Clinic API]
  (portal/backend/)                               (partner-api/backend/)
- Cloud Run, real IAP + external HTTPS             Cloud Run, API-key auth
- Load Balancer + Cloud Armor + managed             (Secret Manager) *and*
- SSL cert on dhg-caretrack.gcpcloudhub.in           IAM-restricted (see note)
+ Cloud Run, ingress locked to the load           Cloud Run, API-key auth
+ balancer: real IAP + external HTTPS LB +          (Secret Manager) *and*
+ Cloud Armor + managed SSL cert on                  IAM-restricted (see note)
+ dhg-caretrack.gcpcloudhub.in
  - patient list, vitals chart (Chart.js),         - GET /patients/{id}/telemetry
    Gemini risk insight                            - OpenAPI spec auto-published
                                                      at /docs, /openapi.json
@@ -73,12 +75,13 @@ application layer exactly as designed — see
 | Column-level security | Dataplex / Data Catalog policy tags | ✅ built, on 2 sensitive columns |
 | Data Access audit logging | Cloud Audit Logs | ✅ built, BigQuery/Healthcare API/DLP |
 | Cost tracking | Resource labels (`environment`, `managed_by`, `project`) | ✅ built |
-| Encryption at rest | Cloud KMS (CMEK) | ⏳ not built - relies on Google-managed encryption |
-| Data exfiltration boundary | VPC Service Controls | ⏳ not built |
-| CI/CD | GitHub Actions | ⏳ not built - all deploys are manual `terraform apply` / `gcloud builds submit` |
-| Observability | Cloud Monitoring dashboards + alert policies | ⏳ not built - default Cloud Logging only |
+| Encryption at rest | Cloud KMS (CMEK) | ◑ partial - key + BigQuery dataset default only (new tables; the 4 existing tables and the Pub/Sub topics keep Google-managed encryption) |
+| Data exfiltration boundary | VPC Service Controls | ⏳ not built - deliberately not attempted (org-level, can lock out live services) |
+| CI/CD | GitHub Actions + Workload Identity Federation | ✅ built - plan on every push/PR, guarded manual apply, per-app image build/deploy (Dataflow excluded) |
+| Observability | Cloud Monitoring alert policy (log-based) | ◑ partial - email on any scheduled-job error; no dashboards, no Dataflow-specific alerts |
 | Reporting | Looker Studio dashboard | ⏳ not built |
-| Alerting schedule | Cloud Scheduler for alerting/risk-insight-processor | ⏳ not built - both run manually; only the generator is scheduled |
+| Pipeline scheduling | Cloud Scheduler | ✅ built - generator, risk-insight-processor and alerting all scheduled, cron-staggered 5 minutes apart |
+| Terraform state | GCS backend (versioned bucket) | ✅ built - shared by local runs and CI |
 
 ## Why FHIR instead of raw BigQuery ingestion
 
@@ -118,37 +121,41 @@ dhg-clinical-insights-demo/
 ├── docs/
 │   ├── architecture.md         This file
 │   ├── known-deviations.md     Where the build differs from the original
-│   │                           plan, and why (TODO - not yet written)
-│   ├── compliance-controls.md  DLP/Dataplex/Audit Logs breakdown
-│   │                           (TODO - not yet written)
+│   │                           plan, why, and what went wrong along the way
+│   ├── compliance-controls.md  DLP / Dataplex / Audit Logs breakdown
 │   └── snapshots/              GCP Console screenshots proving each piece
-│                                is real, organized by area
+│                               is real, organized by area
 ├── terraform/
 │   ├── environments/prod/      main.tf, variables.tf, terraform.tfvars,
-│   │                           secrets.auto.tfvars (gitignored)
+│   │                           secrets.auto.tfvars (gitignored); state
+│   │                           lives in a versioned GCS bucket
 │   └── modules/
 │       ├── pubsub/
 │       ├── networking/         VPC + 2 subnets (asia-south1, us-central1)
 │       ├── healthcare-api/     FHIR dataset + store
-│       ├── bigquery/           dataset + 4 tables (schemas as .json/.tpl)
+│       ├── bigquery/           dataset + 4 tables (schemas as .json/.tpl);
+│       │                       optional CMEK default key on the dataset
 │       ├── dataflow/           Flex Template job
 │       ├── data-governance/    Data Catalog taxonomy + policy tag
-│       │                       (this is where Dataplex tagging + BQML
-│       │                       actually live - no separate bigquery-ml,
-│       │                       dlp, or dataplex-tagging modules exist)
 │       ├── audit-logging/      Data Access audit config, 3 services
-│       ├── cloud-run-generator/  Cloud Run Job + Cloud Scheduler
+│       ├── security-kms/       Key ring + key (90-day rotation), grants
+│       │                       for BigQuery and Pub/Sub service agents
+│       ├── monitoring/         Email channel, log-based error metric,
+│       │                       alert policy for the scheduled jobs
+│       ├── cloud-run-generator/  Generator Cloud Run Job + Scheduler
+│       ├── pipeline-jobs/      risk-insight-processor + alerting Cloud
+│       │                       Run Jobs + Schedulers + OAuth-token secret
 │       ├── clinician-portal/   Cloud Run service (the portal itself)
 │       ├── portal-edge/        DNS + Load Balancer + IAP + Cloud Armor +
 │       │                       managed SSL cert in front of the portal
-│       └── partner-api/        Cloud Run service + Secret Manager
-│                               (no vertex-ai-gemini or alerting-email
-│                               modules - Gemini and alerting are plain
-│                               Python apps, not Terraform-managed infra;
-│                               no iam-security module - IAM lives inline
-│                               in each module that needs it; no
-│                               monitoring, looker-studio, or cost-labels
-│                               modules - not built yet)
+│       ├── partner-api/        Cloud Run service + Secret Manager
+│       └── github-actions-wif/ Workload Identity Federation + the CI
+│                               deployer service account
+│                               (Not modules: Gemini and alerting are plain
+│                               Python apps; IAM lives inline in each
+│                               module; no bigquery-ml, dlp,
+│                               dataplex-tagging, looker-studio or
+│                               cost-labels modules exist.)
 ├── generator/                  Synthetic patient generator + patient pool
 │                               (patient_profiles.py)
 ├── pipeline/
@@ -157,10 +164,11 @@ dhg-clinical-insights-demo/
 │   │                           BigQuery directly (no separate
 │   │                           fhir-ingestion or dlp-deidentifier
 │   │                           components - this one pipeline does both)
-│   └── risk-insight-processor/ BigQuery ML score + Gemini explanation,
-│                               run manually today
+│   └── risk-insight-processor/ BigQuery ML score + Gemini explanation
+│                               (containerized Cloud Run Job)
 ├── alerting/                   Email alert on high-risk flag (Gmail API,
-│                               OAuth, HTML/color-coded), run manually
+│                               OAuth token from Secret Manager,
+│                               containerized Cloud Run Job)
 ├── portal/backend/             Clinician portal - FastAPI + Jinja2 +
 │                               Chart.js, no separate frontend/ dir
 ├── partner-api/backend/        Partner-clinic API - FastAPI, API-key
@@ -170,6 +178,8 @@ dhg-clinical-insights-demo/
 │   ├── bqml_model_risk_score.sql
 │   └── views/                  observations_wide, observations_wide_labeled,
 │                               latest_risk_scores, clinician_dashboard_view
-└── .github/workflows/          ⏳ not built - no CI/CD yet, all deploys
-                               are manual terraform apply / gcloud builds
+└── .github/workflows/
+    ├── terraform.yml           plan on push/PR; manual, destroy-guarded apply
+    └── build-and-deploy.yml    rebuilds + rolls out the 5 app images
+                                (Dataflow deliberately excluded)
 ```

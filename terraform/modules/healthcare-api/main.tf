@@ -25,8 +25,10 @@ resource "google_healthcare_fhir_store" "caretrack_fhir" {
   }
 }
 
-# TODO: set var.pipeline_service_account (created in the iam-security module)
-# before applying, or comment this resource out until that SA exists.
+# NOTE: this grant is only created when var.pipeline_service_account is set,
+# and nothing in this repo sets it - the Dataflow workers' FHIR access was
+# granted by hand instead (no iam-security module exists). See
+# docs/known-deviations.md.
 resource "google_healthcare_dataset_iam_member" "fhir_writer" {
   count      = var.pipeline_service_account != "" ? 1 : 0
   dataset_id = google_healthcare_dataset.caretrack.id

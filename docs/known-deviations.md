@@ -51,6 +51,20 @@ exactly what's real, what's approximated, and what's still open.
   consistent, but the FHIR store still has a mix of both formats from
   before the cleanup.
 
+- **The Dataflow workers' IAM grants were applied by hand and are not in
+  Terraform.** The pipeline runs as the project's default Compute Engine
+  service account, which was granted `dataflow.worker`,
+  `pubsub.subscriber`, `bigquery.dataEditor`, `bigquery.jobUser`,
+  `healthcare.fhirResourceEditor`, `artifactregistry.writer`,
+  `storage.objectAdmin`, `logging.logWriter` and `dlp.user` with
+  `gcloud` commands as each need surfaced. The `healthcare-api` module
+  does contain a FHIR-writer grant, but it is gated on a
+  `pipeline_service_account` variable that nothing ever sets, so it
+  never creates anything. Consequence: applying this repo to a fresh
+  project would build a pipeline that cannot run until those grants are
+  added. Codifying them (ideally on a dedicated Dataflow service account
+  rather than the broad default one) is the honest next step.
+
 ## AI/ML
 
 - **`gemini-2.0-flash-001` was retired June 1, 2026** (discovered mid-build,
@@ -86,6 +100,26 @@ exactly what's real, what's approximated, and what's still open.
   the Automation section below for the token-expiry caveat this doesn't
   remove.
 
+- **Alert emails were first sent to an address with no mailbox.** When
+  the alerting job was scheduled, both mail recipients (the alerting job's
+  `--to-email` and the Cloud Monitoring notification channel) were wired
+  to the first entry of `clinician_emails`, `admin@gcpcloudhub.in`. That
+  address is a Google *sign-in identity* used for IAM and IAP, but it has
+  no Gmail mailbox (the Workspace Admin console had no Gmail app, which
+  should have been the warning). Google's mail servers accepted the
+  domain and then bounced every message with `550 5.1.1 NoSuchUser`, so
+  the alert emails - and any Monitoring alerts - were never delivered.
+  Fixed by adding a dedicated `notification_email` variable pointing at a
+  real mailbox, separate from the IAM identities. The general lesson: a
+  valid MX record and a working sign-in do not mean an address can
+  receive mail - send a test message before wiring an alert to it.
+- **Alert volume is not yet controlled.** The alerting job runs every 15
+  minutes with a 1-hour lookback, and nearly every synthetic patient
+  scores as high risk, so once delivery works the same assessments are
+  re-sent across overlapping runs (roughly 4 emails an hour). Alerting
+  only on assessments not already reported, or sending a digest, is not
+  implemented yet.
+
 ## Clinician Portal, domain, and networking
 
 - **The custom domain's root DNS was broken for most of this build.**
@@ -119,9 +153,14 @@ exactly what's real, what's approximated, and what's still open.
 - **The Clinician Portal was first built without real IAP**, using only
   Cloud Run's own IAM authentication (`gcloud run services proxy` for
   access), before the domain + Load Balancer + IAP + Cloud Armor stack was
-  added. Both states are preserved in `terraform/modules/clinician-portal`
-  via an `ingress` variable, so IAM-only access remains available as a
-  fallback while `gcpcloudhub.in`'s domain health is verified over time.
+  added. Once the domain's DNS was repaired and the managed certificate
+  went ACTIVE, its ingress was **locked to the load balancer**
+  (`INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`): the direct Cloud Run URL now
+  returns 404 even for an authenticated caller, and
+  `gcloud run services proxy` no longer reaches the portal. The `ingress`
+  variable in `terraform/modules/clinician-portal` is kept so direct
+  access can be reopened temporarily for debugging - set it back
+  afterwards.
 
 ## Partner-Clinic API
 
@@ -154,7 +193,13 @@ exactly what's real, what's approximated, and what's still open.
   benefit this late in the build. The KMS key and the Pub/Sub service
   agent's grant on it both already exist and are ready for this, whenever
   a deliberate, carefully-timed topic recreation (or a fresh project) is
-  worth doing.
+  worth doing. Two snags worth knowing: BigQuery's CMEK service account
+  (`bq-<project-number>@bigquery-encryption...`) doesn't exist until
+  something asks for it (`GET .../projects/<id>/serviceAccount` creates
+  it), so the first key grant failed with "service account does not
+  exist"; and the dataset update originally raced that grant because it
+  only referenced the key, not the grant - fixed with a `depends_on` on
+  the key output.
 - **VPC Service Controls was not attempted.** This is a fundamentally
   different class of change from everything else in this repo: an
   **org-level** singleton resource (one Access Context Manager policy per
@@ -198,11 +243,12 @@ high-risk patients, won't change when the next stage fires.
   manual Terraform edit - not something safe to trigger on every push to
   `pipeline/dataflow-beam/`.
 
-### Setting up CI/CD: what actually went wrong, in order
+### CI/CD: what actually went wrong, in order
 
-Getting GitHub Actions to a genuinely clean, working `terraform apply`
-took five real, separate failures - each one a legitimate gap, not a
-typo. In the order they were hit:
+Getting GitHub Actions to a clean, safe `terraform apply` took six real,
+separate failures - each one a legitimate gap, not a typo - and the
+workflow was restructured because of the last one. In the order they were
+hit:
 
 1. **No shared state backend.** `main.tf`'s backend block was left
    commented out (local state only, gitignored, living solely on one
@@ -221,7 +267,8 @@ typo. In the order they were hit:
    "Run workflow" click matched neither, so it "succeeded" in ~13 seconds
    having done nothing but `init`/`validate` - a false green, not a real
    test. Fixed by widening the apply condition to also accept
-   `workflow_dispatch`.
+   `workflow_dispatch` (the workflow was later restructured again - see
+   item 6).
 3. **`terraform fmt -check` blocked on pure style, not substance.** A few
    files weren't in Terraform's canonical alignment (spacing edits made
    by hand, not run through `terraform fmt`), and `-check` fails the
@@ -238,7 +285,10 @@ typo. In the order they were hit:
    Since this repo's Terraform manages a live secret version (the
    partner API key), the CI deployer needed `roles/secretmanager.admin`
    explicitly - reading that secret's current value during a plan
-   refresh failed with a `403` until this was added.
+   refresh failed with a `403` until this was added. Editor also
+   excludes Cloud KMS, Monitoring and Logging administration, so those
+   three admin roles were granted up front when the KMS and Monitoring
+   modules were added, rather than waiting to hit the same error again.
 5. **The CI deployer's role list is broader than a real production setup
    should use for one identity** (`roles/editor` plus several
    IAM/security/secret-admin roles - see
@@ -249,3 +299,31 @@ typo. In the order they were hit:
    roles), and the Workload Identity Federation trust itself is
    correctly locked to this exact repo (`attribute_condition`) so at
    least the *identity* can't be impersonated from anywhere else.
+6. **A partial push made CI try to delete live infrastructure.** The KMS
+   and Monitoring resources had been applied locally, but the commit
+   that went to GitHub contained only an unrelated one-file change - the
+   new modules never left the laptop. CI, which then auto-applied
+   whatever was on `main`, saw resources in shared state that were
+   missing from the pushed code and planned to destroy them (including
+   the CI account's own new roles). The unpushed files were the
+   giveaway: `git status` showed them untracked, and the commit
+   contained one file instead of ten. A local `terraform plan` showed
+   exactly what had been removed, and re-applying restored everything (8
+   resources, no data touched). The fix was structural, not just
+   "commit more carefully": pushes and PRs now run **plan only**;
+   applying is a deliberate manual run of the workflow, applies the exact
+   saved plan it just showed, and **refuses to run at all if that plan
+   deletes or replaces anything** unless `allow_destroy` is explicitly
+   ticked.
+
+### Smaller snags worth knowing
+
+- **Terraform uses Application Default Credentials, not your `gcloud`
+  login.** A Workspace re-authentication requirement expired the ADC
+  token (`invalid_rapt`) while `gcloud` commands kept working, so
+  `terraform plan` failed reading the state bucket. Fixed with
+  `gcloud auth application-default login`.
+- **Adding new modules requires `terraform init` first**, even though the
+  code is otherwise valid - the plan fails with "Module not installed".
+- **`git add terraform` is too broad.** A saved `tfplan` file can contain
+  secret values; stage explicit paths instead.

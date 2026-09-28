@@ -34,21 +34,29 @@ not validated by any clinician.
    resources (Patient, Observation, DiagnosticReport).
 4. Free-text report notes pass through **Cloud DLP** for de-identification
    before storage.
-5. FHIR data is exported to **BigQuery** for analytics, with column-level
-   security tags (**Dataplex**) on sensitive fields and **Cloud Audit Logs**
-   enabled on all data access.
+5. The same Dataflow job also writes the data to **BigQuery** for analytics,
+   with column-level security tags (**Dataplex**) on sensitive fields and
+   **Cloud Audit Logs** enabled on data access. The dataset's default
+   encryption uses a customer-managed **Cloud KMS** key (new tables only —
+   see [known-deviations.md](docs/known-deviations.md)).
 6. A **BigQuery ML** model produces a numeric risk score per patient; **Gemini**
    (via Vertex AI) produces a plain-language explanation of that risk.
-7. High-risk flags trigger an **email alert** to the clinician.
+7. High-risk assessments trigger an **email alert** to the clinician. Scoring
+   and alerting run as scheduled Cloud Run Jobs, staggered after each
+   generator run.
 8. A **Clinician Portal** (Cloud Run, behind IAP) shows each dummy patient's
    vitals history and risk insight.
 9. A **Partner-Clinic API** (Cloud Run, API-key secured) exposes patient data
    to simulate an external clinic integration.
-10. Deployed via **Terraform**, applied manually today (no CI/CD pipeline
-    yet — see [known-deviations.md](docs/known-deviations.md)). Protected by
-    **Cloud Armor** and **Secret Manager**, both real and deployed. **VPC
-    Service Controls**, **Cloud KMS (CMEK)**, and **Cloud Monitoring**
-    dashboards are part of the original design but not yet built.
+10. Deployed via **Terraform** with a shared GCS state backend. **GitHub
+    Actions** authenticates through Workload Identity Federation (no stored
+    keys): pushes run `terraform plan`, and applying is a deliberate manual
+    run that refuses any plan containing deletes unless explicitly allowed.
+    Protected by **Cloud Armor**, **IAP**, and **Secret Manager**; a
+    **Cloud Monitoring** alert emails on scheduled-job errors. **VPC Service
+    Controls** was deliberately not attempted, and the Dataflow pipeline is
+    excluded from automated deploys — see
+    [known-deviations.md](docs/known-deviations.md) for why.
 
 ## Architecture
 

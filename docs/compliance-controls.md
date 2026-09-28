@@ -90,8 +90,13 @@ alerting on anomalous access patterns.
 These are real gaps, not oversights being glossed over - see
 [known-deviations.md](known-deviations.md) for the full list:
 
-- No Cloud KMS (CMEK) - BigQuery and Pub/Sub use Google-managed encryption
-- No VPC Service Controls perimeter
-- No log sink/SIEM integration consuming the audit logs this enables
+- CMEK is only partial: the BigQuery dataset's default key is set, but that
+  applies to new tables only - the 4 existing tables and the Pub/Sub topics
+  still use Google-managed encryption
+- No VPC Service Controls perimeter (deliberately not attempted - it is an
+  org-level control that can lock out live services)
+- No log sink/SIEM integration consuming the audit logs this enables (the
+  Monitoring alert only watches the scheduled jobs for errors, not access
+  patterns)
 - The BigQuery ML risk label is a synthetic, rule-derived heuristic, not a
   validated clinical model - see known-deviations.md for detail
