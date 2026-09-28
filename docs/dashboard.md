@@ -1,4 +1,22 @@
-# Looker Studio dashboard
+# Dashboard and analytics
+
+There are two ways to see the population-level view described here. The
+first is defined entirely in code; the second is built by hand.
+
+## Portal analytics page (in code)
+
+The Clinician Portal serves `/analytics` (`portal/backend/main.py`,
+`portal/backend/templates/analytics.html`): KPI cards, a risk-level donut,
+average vitals by hour, risk assessments per hour by level, readings
+ingested per 15 minutes, and a patient table. It reads only the three
+`dashboard_*` views below, so it cannot display the policy-tagged columns.
+It is reachable only through the load balancer (IAP + Cloud Armor), so it
+is private by design and cannot be shared with a public link. Query results
+are cached for 60 seconds. Its rendering logic was tested against faked
+BigQuery data; the SQL itself only runs against real BigQuery.
+
+## Looker Studio report (optional, by hand)
+
 
 An analytics dashboard over the same BigQuery data the Clinician Portal
 uses, aimed at a *population* view (all patients, trends, pipeline health)
@@ -62,17 +80,20 @@ generator's cadence; Looker Studio's default would leave the charts up to
 
 The report is not in Terraform, so this is the recipe to recreate it.
 
-**1. Open a new report with the three data sources attached** (Looker
-Studio "Linking API"). Use an incognito window signed in only as the
-organization account, otherwise the link may open under the wrong Google
-account and the BigQuery connection is refused:
+**1. Create the report and add the three data sources by hand.** Use an
+incognito window signed in only as the organization account, otherwise
+Looker Studio may open under the wrong Google account and the BigQuery
+connection is refused.
 
-```
-https://lookerstudio.google.com/reporting/create?c.mode=edit&r.reportName=DHG%20CareTrack%20-%20Clinical%20Insights&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=dashboard_patient_snapshot&ds.ds0.projectId=dhg-caretrack&ds.ds0.type=TABLE&ds.ds0.datasetId=dhg_caretrack&ds.ds0.tableId=dashboard_patient_snapshot&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=dashboard_vitals_timeseries&ds.ds1.projectId=dhg-caretrack&ds.ds1.type=TABLE&ds.ds1.datasetId=dhg_caretrack&ds.ds1.tableId=dashboard_vitals_timeseries&ds.ds2.connector=bigQuery&ds.ds2.datasourceName=dashboard_risk_history&ds.ds2.projectId=dhg-caretrack&ds.ds2.type=TABLE&ds.ds2.datasetId=dhg_caretrack&ds.ds2.tableId=dashboard_risk_history
-```
+Create > Report > BigQuery connector > `dhg-caretrack` > `dhg_caretrack`,
+then add `dashboard_patient_snapshot`. In the editor use Add data > BigQuery
+to add `dashboard_vitals_timeseries` and `dashboard_risk_history`.
 
-If only the first source attaches, add the other two by hand
-(Resource > Manage added data sources > Add a data source > BigQuery).
+(Looker Studio's Linking API cannot do this in one link: a blank report has
+no data source aliases, so `ds0`/`ds1`/`ds2` are rejected with "not a valid
+data source alias". The API works only against an existing template report
+via `c.reportId`; once this report exists it can serve as that template, for
+example to let others create a copy pointed at their own dataset.)
 
 **2. On each data source**, set Data freshness to 15 minutes and leave the
 data credentials on the owner's.

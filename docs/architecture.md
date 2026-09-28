@@ -79,7 +79,7 @@ application layer exactly as designed — see
 | Data exfiltration boundary | VPC Service Controls | ⏳ not built - deliberately not attempted (org-level, can lock out live services) |
 | CI/CD | GitHub Actions + Workload Identity Federation | ✅ built - plan on every push/PR, guarded manual apply, per-app image build/deploy (Dataflow excluded) |
 | Observability | Cloud Monitoring alert policy (log-based) | ◑ partial - email on any scheduled-job error; no dashboards, no Dataflow-specific alerts |
-| Reporting | Looker Studio dashboard | ⏳ not built |
+| Reporting | Analytics page in the portal (`/analytics`), defined in code | ✅ built - reads the governance-clean `dashboard_*` views; a Looker Studio report on the same views is optional and built by hand |
 | Pipeline scheduling | Cloud Scheduler | ✅ built - generator, risk-insight-processor and alerting all scheduled, cron-staggered 5 minutes apart |
 | Terraform state | GCS backend (versioned bucket) | ✅ built - shared by local runs and CI |
 

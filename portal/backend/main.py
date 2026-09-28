@@ -10,16 +10,15 @@ ALL DATA IS SYNTHETIC. No real patient is involved. Nothing shown here is
 a medical diagnosis - the risk level and explanation are demonstration
 outputs from BigQuery ML and Gemini, described that way on every page.
 
-AUTH NOTE: this service is deployed with --no-allow-unauthenticated
-(Cloud Run's built-in IAM auth), not full Identity-Aware Proxy. Real IAP
-requires an external HTTPS Load Balancer, a reserved static IP, and a
-managed SSL certificate tied to a real domain - out of scope for this
-demo. Cloud Run IAM auth provides the same practical protection (only
-IAM-authenticated identities can reach the service); it just lacks IAP's
-branded consent screen. See docs/known-deviations.md.
+AUTH NOTE: the service's Cloud Run ingress is locked to the external HTTPS
+load balancer, so it is reachable only through Identity-Aware Proxy plus
+Cloud Armor on dhg-caretrack.gcpcloudhub.in; the direct Cloud Run URL
+returns 404. See docs/known-deviations.md.
 """
 
 import os
+import time
+from datetime import timezone
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -105,6 +104,148 @@ def fetch_latest_risk_assessment(patient_id):
     return rows[0] if rows else None
 
 
+# ---------------------------------------------------------------------------
+# Analytics page: population-level view over the dashboard_* views.
+# Those views deliberately never select the policy-tagged columns
+# (gemini_explanation, report_text_redacted), so this page cannot show them.
+# ---------------------------------------------------------------------------
+
+_CACHE = {}
+_CACHE_TTL_SECONDS = 60  # data changes every ~15 min; avoids 5 queries per refresh
+
+
+def _cached(key, fn):
+    now = time.time()
+    hit = _CACHE.get(key)
+    if hit and now - hit[0] < _CACHE_TTL_SECONDS:
+        return hit[1]
+    value = fn()
+    _CACHE[key] = (now, value)
+    return value
+
+
+def _rows(query):
+    return [dict(r) for r in bq_client.query(query).result()]
+
+
+def fetch_snapshot():
+    return _rows(f"""
+        SELECT patient_id, last_reading_at, minutes_since_last_reading,
+               heart_rate, spo2, bp_systolic, bp_diastolic,
+               ml_risk_score, risk_level
+        FROM `{PROJECT_ID}.{BQ_DATASET}.dashboard_patient_snapshot`
+        ORDER BY ml_risk_score DESC, patient_id
+    """)
+
+
+def fetch_vitals_by_hour():
+    return _rows(f"""
+        SELECT TIMESTAMP_TRUNC(event_timestamp, HOUR) AS hour,
+               AVG(heart_rate) AS heart_rate,
+               AVG(spo2) AS spo2,
+               AVG(bp_systolic) AS bp_systolic
+        FROM `{PROJECT_ID}.{BQ_DATASET}.dashboard_vitals_timeseries`
+        WHERE event_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+        GROUP BY hour
+        ORDER BY hour
+    """)
+
+
+def fetch_risk_by_hour():
+    return _rows(f"""
+        SELECT TIMESTAMP_TRUNC(assessed_at, HOUR) AS hour, risk_level, COUNT(*) AS n
+        FROM `{PROJECT_ID}.{BQ_DATASET}.dashboard_risk_history`
+        WHERE assessed_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+        GROUP BY hour, risk_level
+        ORDER BY hour
+    """)
+
+
+def fetch_ingestion():
+    return _rows(f"""
+        SELECT TIMESTAMP_SECONDS(900 * DIV(UNIX_SECONDS(event_timestamp), 900)) AS bucket,
+               COUNT(*) AS readings
+        FROM `{PROJECT_ID}.{BQ_DATASET}.dashboard_vitals_timeseries`
+        WHERE event_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 6 HOUR)
+        GROUP BY bucket
+        ORDER BY bucket
+    """)
+
+
+def _label(ts, fmt="%d %b %H:%M"):
+    return ts.astimezone(timezone.utc).strftime(fmt) if ts else ""
+
+
+def _r(value, digits=1):
+    return round(value, digits) if value is not None else None
+
+
+def _avg(rows, key):
+    vals = [r[key] for r in rows if r.get(key) is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def build_analytics_context():
+    snapshot = _cached("snapshot", fetch_snapshot)
+    vitals = _cached("vitals", fetch_vitals_by_hour)
+    risk_hourly = _cached("risk_hourly", fetch_risk_by_hour)
+    ingestion = _cached("ingestion", fetch_ingestion)
+
+    levels = ["high", "medium", "low"]
+    ages = [p["minutes_since_last_reading"] for p in snapshot
+            if p.get("minutes_since_last_reading") is not None]
+    kpis = {
+        "patients": len(snapshot),
+        "high_risk": sum(1 for p in snapshot if p.get("risk_level") == "high"),
+        "avg_hr": _r(_avg(snapshot, "heart_rate")),
+        "avg_spo2": _r(_avg(snapshot, "spo2")),
+        "freshest_min": min(ages) if ages else None,
+    }
+
+    patients = []
+    for p in snapshot:
+        sys_, dia = p.get("bp_systolic"), p.get("bp_diastolic")
+        patients.append({
+            **p,
+            "bp": f"{round(sys_)}/{round(dia)}" if sys_ is not None and dia is not None else "—",
+            "last_reading_label": _label(p.get("last_reading_at")),
+        })
+
+    hours = sorted({r["hour"] for r in risk_hourly})
+    charts = {
+        "vitals": {
+            "labels": [_label(v["hour"], "%H:%M") for v in vitals],
+            "heart_rate": [_r(v["heart_rate"]) for v in vitals],
+            "bp_systolic": [_r(v["bp_systolic"]) for v in vitals],
+            "spo2": [_r(v["spo2"]) for v in vitals],
+        },
+        "risk_split": {
+            "labels": levels,
+            "values": [sum(1 for p in snapshot if p.get("risk_level") == lv) for lv in levels],
+            "colors": [RISK_COLORS[lv] for lv in levels],
+        },
+        "risk_by_hour": {
+            "labels": [_label(h, "%H:%M") for h in hours],
+            "datasets": [
+                {
+                    "label": lv,
+                    "color": RISK_COLORS[lv],
+                    "data": [
+                        sum(r["n"] for r in risk_hourly if r["hour"] == h and r["risk_level"] == lv)
+                        for h in hours
+                    ],
+                }
+                for lv in levels
+            ],
+        },
+        "ingestion": {
+            "labels": [_label(i["bucket"], "%H:%M") for i in ingestion],
+            "values": [i["readings"] for i in ingestion],
+        },
+    }
+    return {"kpis": kpis, "patients": patients, "charts": charts, "risk_colors": RISK_COLORS}
+
+
 @app.get("/", response_class=HTMLResponse)
 def patient_list(request: Request):
     patients = fetch_patient_list()
@@ -139,6 +280,13 @@ def patient_detail(request: Request, patient_id: str):
             "chart_bp_systolic": chart_bp_systolic,
             "chart_spo2": chart_spo2,
         },
+    )
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+def analytics(request: Request):
+    return templates.TemplateResponse(
+        "analytics.html", {"request": request, **build_analytics_context()}
     )
 
 
