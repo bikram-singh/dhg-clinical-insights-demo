@@ -1,143 +1,81 @@
-# Dashboard and analytics
+# Analytics dashboard
 
-There are two ways to see the population-level view described here. The
-first is defined entirely in code; the second is built by hand.
+The Clinician Portal's `/analytics` page is the project's dashboard: a
+*population* view across all patients, next to the portal's per-patient
+drill-down. **Synthetic data only.**
 
-## Portal analytics page (in code)
+It is defined entirely in code (`portal/backend/main.py` and
+`portal/backend/templates/analytics.html`), deployed by the same pipeline as
+the rest of the portal, and reachable only through the load balancer (IAP +
+Cloud Armor), so it is private by design.
 
-The Clinician Portal serves `/analytics` (`portal/backend/main.py`,
-`portal/backend/templates/analytics.html`): KPI cards, a risk-level donut,
-average vitals by hour, risk assessments per hour by level, readings
-ingested per 15 minutes, and a patient table. It reads only the three
-`dashboard_*` views below, so it cannot display the policy-tagged columns.
-It is reachable only through the load balancer (IAP + Cloud Armor), so it
-is private by design and cannot be shared with a public link. A risk badge marked "updating" means the assessment was computed
-before that patient's newest reading arrived (the scorer runs a few minutes
-after each ingest), so the vitals and the risk shown can briefly disagree.
-Query results
-are cached for 60 seconds. Its rendering logic was tested against faked
-BigQuery data; the SQL itself only runs against real BigQuery.
+## What it shows
 
-## Looker Studio report (optional, by hand)
-
-
-An analytics dashboard over the same BigQuery data the Clinician Portal
-uses, aimed at a *population* view (all patients, trends, pipeline health)
-rather than the portal's per-patient drill-down. **Synthetic data only.**
-
-The dashboard itself is built in the Looker Studio UI - there is no
-Terraform resource for a Looker Studio report. What *is* in code is
-everything it reads from: three BigQuery views in
-[`terraform/modules/bigquery/views.tf`](../terraform/modules/bigquery/views.tf).
+- **KPI cards:** patients monitored, high risk now, high-risk assessments in
+  the last 24 hours, average heart rate, average SpO2, and how many minutes
+  ago the newest reading arrived.
+- **Charts:** risk level split (latest assessment per patient); average vitals
+  by hour (24 h); risk assessments per hour by level (24 h); readings ingested
+  per 15 minutes (6 h), where a steady bar per 15 minutes shows the generator
+  and pipeline running without gaps.
+- **Patient table,** highest risk first, with blood pressure, heart rate,
+  SpO2 and last reading; each patient links to their detail page.
+- **"updating" marker.** A risk badge marked "updating" means the assessment
+  was computed before that patient's newest reading arrived (the scorer runs a
+  few minutes after each ingest), so the vitals and the risk shown can briefly
+  disagree.
 
 ## Data sources
 
+Three BigQuery views, defined in
+[`terraform/modules/bigquery/views.tf`](../terraform/modules/bigquery/views.tf):
+
 | View | Grain | Used for |
 |---|---|---|
-| `dashboard_patient_snapshot` | one row per patient | overview: latest vitals, latest risk, minutes since last reading |
-| `dashboard_vitals_timeseries` | one row per reading, last 7 days | vitals trends, ingestion volume |
-| `dashboard_risk_history` | one row per assessment | risk over time, assessments per hour |
+| `dashboard_patient_snapshot` | one row per patient | KPI cards, patient table, risk split |
+| `dashboard_vitals_timeseries` | one row per reading, last 7 days | vitals by hour, ingestion cadence |
+| `dashboard_risk_history` | one row per assessment | assessments per hour, 24 h high-risk count |
 
 ## Governance decisions
 
-- **The views never select the policy-tagged columns**
-  (`gemini_explanation`, `report_text_redacted`). Column-level security is
-  enforced by BigQuery for whoever's credentials run the query. A Looker
-  Studio data source on the *owner's* credentials would let every viewer
-  read whatever the owner can, silently bypassing the policy tag - so the
-  protection is built into what the views expose instead of relying on who
-  the viewer is.
-- Columns are listed explicitly (no `SELECT *`) so a future tagged column
-  cannot leak into a dashboard by accident.
-- **The report must be owned by an identity with BigQuery access**, i.e. the
-  organization account. The personal Gmail used for alert emails cannot be
-  granted BigQuery access, because the organization's Domain Restricted
-  Sharing policy blocks IAM grants to external identities.
-- Whether an "anyone with the link" report is possible depends on the
-  domain's Looker Studio sharing settings in the Workspace Admin console;
-  if external sharing is off, share within the organization or publish
-  screenshots instead.
+- **The views never select the policy-tagged columns** (`gemini_explanation`,
+  `report_text_redacted`), and every column is listed explicitly (no
+  `SELECT *`), so a future tagged column cannot leak into the dashboard by
+  accident. The page itself runs as the portal's service account, which is
+  cleared for those columns (the patient detail page needs them), so the
+  protection here is by construction: the analytics queries touch only these
+  views.
+- The views are built only on the Terraform-managed tables, not on the older
+  hand-created `observations_wide` / `latest_risk_scores` views, so they can be
+  reproduced from this repo alone.
 - The older `sql/views/clinician_dashboard_view.sql` is superseded and not
-  used (it reads the always-empty `patients` table and exposes
-  `gemini_explanation`).
+  used: it reads the always-empty `patients` table and exposes
+  `gemini_explanation`.
+- Query results are cached in the portal for 60 seconds, and the page
+  refreshes itself every 5 minutes.
 
-## Pages
+## Why not Looker Studio
 
-1. **Overview** (`dashboard_patient_snapshot`) - scorecards for patients
-   monitored, high-risk patients now, average heart rate and SpO2, and
-   minutes since the latest reading; a patient table with risk level and
-   score; a risk-level distribution chart.
-2. **Vitals trends** (`dashboard_vitals_timeseries`) - patient and date
-   controls; heart rate, SpO2, blood pressure and temperature over time.
-3. **Risk over time** (`dashboard_risk_history`) - average risk score per
-   hour, assessments per hour by level, and a patient-by-time heatmap.
-4. **Pipeline health** (`dashboard_vitals_timeseries`,
-   `dashboard_risk_history`) - readings per 15 minutes (the generator's
-   cadence), freshest reading, assessments per hour.
-
-Data freshness on every data source is set to 15 minutes to match the
-generator's cadence; Looker Studio's default would leave the charts up to
-12 hours stale.
-
-## Rebuilding the report
-
-The report is not in Terraform, so this is the recipe to recreate it.
-
-**1. Create the report and add the three data sources by hand.** Use an
-incognito window signed in only as the organization account, otherwise
-Looker Studio may open under the wrong Google account and the BigQuery
-connection is refused.
-
-Create > Report > BigQuery connector > `dhg-caretrack` > `dhg_caretrack`,
-then add `dashboard_patient_snapshot`. In the editor use Add data > BigQuery
-to add `dashboard_vitals_timeseries` and `dashboard_risk_history`.
-
-(Looker Studio's Linking API cannot do this in one link: a blank report has
-no data source aliases, so `ds0`/`ds1`/`ds2` are rejected with "not a valid
-data source alias". The API works only against an existing template report
-via `c.reportId`; once this report exists it can serve as that template, for
-example to let others create a copy pointed at their own dataset.)
-
-**2. On each data source**, set Data freshness to 15 minutes and leave the
-data credentials on the owner's.
-
-**3. Calculated field** on `dashboard_patient_snapshot`, named `BP`:
-`CONCAT(CAST(ROUND(bp_systolic, 0) AS TEXT), "/", CAST(ROUND(bp_diastolic, 0) AS TEXT))`
-
-**4. Colors** (same as the portal and the alert email): high `#c0392b`,
-medium `#d68910`, low `#1e8449`.
-
-**5. Charts**
-
-| Page | Chart | Source | Dimension | Metric | Notes |
-|---|---|---|---|---|---|
-| Overview | Scorecard: patients monitored | snapshot | - | patient_id, Count Distinct | |
-| Overview | Scorecard: high-risk now | snapshot | - | Record Count | filter risk_level = high |
-| Overview | Scorecards: avg heart rate, avg SpO2 | snapshot | - | heart_rate Avg; spo2 Avg | |
-| Overview | Scorecard: newest reading age (min) | snapshot | - | minutes_since_last_reading MIN | healthy if about 20 or less |
-| Overview | Table | snapshot | patient_id, risk_level, BP | ml_risk_score, heart_rate, spo2, last_reading_at | sort by score desc; color risk_level |
-| Overview | Donut | snapshot | risk_level | Record Count | slice colors as above |
-| Vitals trends | Controls | timeseries | patient_id drop-down; date range | - | date range dimension: event_timestamp |
-| Vitals trends | Time series x4 | timeseries | event_timestamp | heart_rate; spo2; bp_systolic + bp_diastolic; body_temp_c | reference lines at 100 bpm, 94 %, 145 mmHg (the risk-label thresholds) |
-| Risk over time | Time series | risk_history | assessed_at (Date Hour) | ml_risk_score Avg | |
-| Risk over time | Stacked columns | risk_history | assessed_at (Date Hour) | Record Count | breakdown: risk_level |
-| Risk over time | Pivot heatmap | risk_history | rows: patient_id; columns: assessed_at (Date Hour) | ml_risk_score Avg | heatmap style |
-| Pipeline health | Column chart | timeseries | event_timestamp (Date Hour Minute) | Record Count | bursts every 15 minutes = the generator schedule |
-| Pipeline health | Column chart | risk_history | assessed_at (Date Hour) | Record Count | assessments per hour |
-
-**6. Every page:** a "SYNTHETIC DATA - demonstration only" banner. Right-click
-it and choose "Make report-level" so it appears on all pages at once.
+A Looker Studio dashboard was in the original design and was started (a
+report with the three data sources connected). It was dropped because a
+Looker Studio report cannot be defined in code: there is no Terraform
+resource, its API cannot create charts, and its Linking API only copies an
+existing report. Building it meant clicking every chart together by hand, with
+nothing to review or reproduce. The views were written to be BI-tool-agnostic,
+so a BI tool can still be pointed at them later. See
+[known-deviations.md](known-deviations.md).
 
 ## Known limitations
 
-- The dashboard shows whatever the synthetic data does. Roughly 10-20% of
-  risk assessments come out high (the rule-derived label fires when any of
-  three thresholds is crossed), so at any given moment the per-patient
-  snapshot can be entirely low risk with zero high-risk patients. The
-  assessments-per-hour chart is where the high-risk share is visible.
-- A "SYNTHETIC DATA - demonstration only" banner is added to every page,
-  matching the portal.
-
-## Link
-
-_Add the report URL here once published._
+- **Private.** There is no public link to share; use screenshots.
+- **The risk mix is modest.** Roughly 10-20% of assessments come out high (the
+  rule-derived label fires when any of three thresholds is crossed), so at any
+  moment the snapshot can show zero or a few high-risk patients. The
+  assessments-per-hour chart shows the share over time.
+- **Scores are effectively binary** (0.00 or 1.00) and no "medium" assessment
+  appears; see the AI/ML section of [known-deviations.md](known-deviations.md).
+- **Partial edge buckets.** The first and last hourly bars cover partial hours,
+  so they look shorter.
+- **Tested with faked data.** The page's rendering and calculations were tested
+  against faked BigQuery results; the SQL itself only runs against real
+  BigQuery.

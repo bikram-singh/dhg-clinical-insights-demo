@@ -4,10 +4,10 @@
 --   * it selects gemini_explanation, a column protected by a Data Catalog
 --     policy tag, so a shared dashboard on it would either fail or bypass
 --     the column-level security.
--- The Looker Studio dashboard uses the dashboard_* views defined in
+-- The portal's /analytics dashboard uses the dashboard_* views defined in
 -- terraform/modules/bigquery/views.tf instead. See docs/dashboard.md.
 --
--- Convenience view for the clinician portal and Looker Studio dashboard.
+-- Convenience view for the clinician portal and analytics dashboard.
 -- Joins each patient to their latest observations and latest risk assessment.
 
 CREATE OR REPLACE VIEW `${project_id}.${dataset_id}.clinician_dashboard_view` AS

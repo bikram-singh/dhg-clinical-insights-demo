@@ -1,4 +1,4 @@
-# Views that back the Looker Studio dashboard (see docs/dashboard.md).
+# Views that back the portal's /analytics dashboard (see docs/dashboard.md).
 #
 # Design rules:
 #  - Built ONLY on the Terraform-managed tables (observations,

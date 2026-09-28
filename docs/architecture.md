@@ -26,6 +26,10 @@
                                       and gemini_explanation
                                     - Cloud Audit Logs (Data Access) enabled
                                       for BigQuery, Healthcare API, DLP
+                                    - CMEK default key on the dataset
+                                      (new tables only)
+                                    - dashboard_* views (never select the
+                                      tagged columns) feed /analytics
                                           |
                                           v
                           [risk-insight-processor]  (Cloud Run Job, scheduled
@@ -52,7 +56,9 @@
  dhg-caretrack.gcpcloudhub.in
  - patient list, vitals chart (Chart.js),         - GET /patients/{id}/telemetry
    Gemini risk insight                            - OpenAPI spec auto-published
-                                                     at /docs, /openapi.json
+ - /analytics: population dashboard                  at /docs, /openapi.json
+   (KPIs, risk mix, trends, ingestion),
+   defined in code, from dashboard_* views
 ```
 
 **Note on Partner-Clinic API auth:** the architecture calls for API-key auth
@@ -79,7 +85,7 @@ application layer exactly as designed — see
 | Data exfiltration boundary | VPC Service Controls | ⏳ not built - deliberately not attempted (org-level, can lock out live services) |
 | CI/CD | GitHub Actions + Workload Identity Federation | ✅ built - plan on every push/PR, guarded manual apply, per-app image build/deploy (Dataflow excluded) |
 | Observability | Cloud Monitoring alert policy (log-based) | ◑ partial - email on any scheduled-job error; no dashboards, no Dataflow-specific alerts |
-| Reporting | Analytics page in the portal (`/analytics`), defined in code | ✅ built - reads the governance-clean `dashboard_*` views; a Looker Studio report on the same views is optional and built by hand |
+| Reporting | Analytics dashboard: the portal's `/analytics` page, defined in code | ✅ built - reads only the governance-clean `dashboard_*` views; replaced a planned Looker Studio report (see [dashboard.md](dashboard.md)) |
 | Pipeline scheduling | Cloud Scheduler | ✅ built - generator, risk-insight-processor and alerting all scheduled, cron-staggered 5 minutes apart |
 | Terraform state | GCS backend (versioned bucket) | ✅ built - shared by local runs and CI |
 
@@ -123,6 +129,8 @@ dhg-clinical-insights-demo/
 │   ├── known-deviations.md     Where the build differs from the original
 │   │                           plan, why, and what went wrong along the way
 │   ├── compliance-controls.md  DLP / Dataplex / Audit Logs breakdown
+│   ├── dashboard.md            The /analytics dashboard: what it shows, the
+│   │                           views behind it, and why not Looker Studio
 │   └── snapshots/              GCP Console screenshots proving each piece
 │                               is real, organized by area
 ├── terraform/
@@ -133,8 +141,9 @@ dhg-clinical-insights-demo/
 │       ├── pubsub/
 │       ├── networking/         VPC + 2 subnets (asia-south1, us-central1)
 │       ├── healthcare-api/     FHIR dataset + store
-│       ├── bigquery/           dataset + 4 tables (schemas as .json/.tpl);
-│       │                       optional CMEK default key on the dataset
+│       ├── bigquery/           dataset + 4 tables (schemas as .json/.tpl),
+│       │                       3 dashboard_* views (views.tf); optional
+│       │                       CMEK default key on the dataset
 │       ├── dataflow/           Flex Template job
 │       ├── data-governance/    Data Catalog taxonomy + policy tag
 │       ├── audit-logging/      Data Access audit config, 3 services
@@ -154,8 +163,8 @@ dhg-clinical-insights-demo/
 │                               (Not modules: Gemini and alerting are plain
 │                               Python apps; IAM lives inline in each
 │                               module; no bigquery-ml, dlp,
-│                               dataplex-tagging, looker-studio or
-│                               cost-labels modules exist.)
+│                               dataplex-tagging or cost-labels
+│                               modules exist.)
 ├── generator/                  Synthetic patient generator + patient pool
 │                               (patient_profiles.py)
 ├── pipeline/
@@ -170,7 +179,9 @@ dhg-clinical-insights-demo/
 │                               OAuth token from Secret Manager,
 │                               containerized Cloud Run Job)
 ├── portal/backend/             Clinician portal - FastAPI + Jinja2 +
-│                               Chart.js, no separate frontend/ dir
+│   │                           Chart.js, no separate frontend/ dir
+│   └── templates/              index.html (patient list), patient.html
+│                               (detail), analytics.html (dashboard)
 ├── partner-api/backend/        Partner-clinic API - FastAPI, API-key
 │                               auth via Secret Manager
 ├── sql/
@@ -178,6 +189,7 @@ dhg-clinical-insights-demo/
 │   ├── bqml_model_risk_score.sql
 │   └── views/                  observations_wide, observations_wide_labeled,
 │                               latest_risk_scores, clinician_dashboard_view
+│                               (superseded - see dashboard.md)
 └── .github/workflows/
     ├── terraform.yml           plan on push/PR; manual, destroy-guarded apply
     └── build-and-deploy.yml    rebuilds + rolls out the 5 app images

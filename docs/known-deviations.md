@@ -168,6 +168,20 @@ exactly what's real, what's approximated, and what's still open.
   access can be reopened temporarily for debugging - set it back
   afterwards.
 
+## Reporting
+
+- **The dashboard is a portal page, not a Looker Studio report.** The
+  original design listed a Looker Studio dashboard. It was started (a report
+  with the three BigQuery data sources connected) and then dropped, because a
+  Looker Studio report cannot be defined in code: there is no Terraform
+  resource for one, the Looker Studio API cannot create charts, and its
+  Linking API can only copy an existing report (against a blank report it
+  rejects the data source aliases with "not a valid data source alias").
+  Every chart would have had to be built by hand, which is neither
+  reproducible nor reviewable. Instead the portal serves an `/analytics`
+  page from code, deployed by the same pipeline. The trade-off: it sits
+  behind IAP, so there is no public link to share; screenshots stand in.
+
 ## Partner-Clinic API
 
 - **The API is IAM-restricted *and* API-key-authenticated, not API-key

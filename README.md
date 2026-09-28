@@ -45,7 +45,12 @@ not validated by any clinician.
    and alerting run as scheduled Cloud Run Jobs, staggered after each
    generator run.
 8. A **Clinician Portal** (Cloud Run, behind IAP) shows each dummy patient's
-   vitals history and risk insight.
+   vitals history and risk insight, plus an **analytics dashboard**
+   (`/analytics`) with population-level KPIs, risk mix, vitals trends and
+   pipeline cadence. The dashboard is defined in code and reads only
+   governance-clean BigQuery views, so it cannot display the protected
+   columns. (A Looker Studio report was planned and dropped — see
+   [docs/dashboard.md](docs/dashboard.md).)
 9. A **Partner-Clinic API** (Cloud Run, API-key secured) exposes patient data
    to simulate an external clinic integration.
 10. Deployed via **Terraform** with a shared GCS state backend. **GitHub
