@@ -95,10 +95,16 @@ piece of the architecture above is real and deployed, organized by area:
   default encryption, and the Cloud Monitoring alert
 - [`cicd/`](docs/snapshots/cicd/) — the Workload Identity Federation pool
   GitHub Actions authenticates through, its provider's repo-only condition,
-  and the versioned GCS bucket that holds the shared Terraform state
+  the GitHub Actions runs (Terraform plan-on-push and the app
+  build-and-deploy workflow), and the versioned GCS bucket that holds the
+  shared Terraform state
+- [`analytics/`](docs/snapshots/analytics/) — the portal's `/analytics`
+  dashboard (KPI cards, risk mix, vitals trends, ingestion cadence, and the
+  patient table with out-of-range values highlighted) and the patient detail
+  page it links to, with the Gemini risk insight
 - [`portal-access-demo/`](docs/snapshots/portal-access-demo/) — the
-  Clinician Portal's patient list, patient detail and analytics pages, and
-  the real IAP sign-in flow
+  Clinician Portal's patient list, the real IAP sign-in flow, and the DNS fix
+  that unblocked the custom domain
 - [`oauth-setup/`](docs/snapshots/oauth-setup/) — the OAuth consent screen
   and client configuration steps needed for the alerting service and IAP
 - [`billing-and-registry/`](docs/snapshots/billing-and-registry/) — billing
