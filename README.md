@@ -31,7 +31,11 @@ Identity Federation — real infrastructure, not a slide deck.*
 
 ## 🔗 Quick Links
 
-🏛️ [**Architecture**](docs/architecture.md) &nbsp;·&nbsp; 📈 [**Dashboard**](docs/dashboard.md) &nbsp;·&nbsp; 🛡️ [**Compliance controls**](docs/compliance-controls.md) &nbsp;·&nbsp; 🧾 [**Known deviations**](docs/known-deviations.md) &nbsp;·&nbsp; 📸 [**All snapshots**](docs/snapshots/) &nbsp;·&nbsp; 🧭 [**Companion blueprint**](https://github.com/bikram-singh/gcp-solutions-architecture-blueprint)
+- 🏛️ [Architecture](https://github.com/bikram-singh/dhg-clinical-insights-demo/blob/main/docs/architecture.md)
+- 📈 [Dashboard](https://github.com/bikram-singh/dhg-clinical-insights-demo/blob/main/docs/dashboard.md)
+- 🛡️ [Compliance controls](https://github.com/bikram-singh/dhg-clinical-insights-demo/blob/main/docs/compliance-controls.md)
+- 🧾 [Known deviations](https://github.com/bikram-singh/dhg-clinical-insights-demo/blob/main/docs/known-deviations.md)
+- 📸 [All snapshots](https://github.com/bikram-singh/dhg-clinical-insights-demo/tree/main/docs/snapshots)
 
 ---
 
@@ -62,12 +66,8 @@ DHG CareTrack is a demonstration platform showing how a healthcare telemetry
 and clinical-insights system can be built and run end to end on Google Cloud —
 with **synthetic patient data**, but a **real, working pipeline**.
 
-It is the companion build to the
-[gcp-solutions-architecture-blueprint](https://github.com/bikram-singh/gcp-solutions-architecture-blueprint)
-capstone (the MedSecure case study). That repo defines the architecture on
-paper across ten solution pillars; this one proves a working slice of it
-actually runs — real infrastructure, real data flow, real AI-generated
-insights — against dummy patients instead of real ones.
+Everything here — the infrastructure, the data flow, and the AI-generated
+insights — is real and running; only the patients are dummies.
 
 > ⚠️ **A note on honesty.** No real patient, wearable device, or hospital
 > system is involved anywhere. Every record, vital sign and report note is
@@ -231,34 +231,53 @@ dhg-clinical-insights-demo/
 │
 ├── 📄 README.md
 ├── 📁 docs/
-│   ├── 📄 architecture.md          # diagrams + component breakdown
-│   ├── 📄 known-deviations.md      # where the build differs from the plan, and what went wrong
-│   ├── 📄 compliance-controls.md   # DLP / Dataplex / Audit Logs breakdown
-│   ├── 📄 dashboard.md             # the /analytics dashboard and the views behind it
-│   └── 📁 snapshots/               # console screenshots, organised by area
+│   ├── 📄 architecture.md                  # data-flow diagram, service status table, repo layout
+│   ├── 📄 known-deviations.md              # where the build differs from the plan, and the incidents behind it
+│   ├── 📄 compliance-controls.md           # DLP, column-level security, audit logging
+│   ├── 📄 dashboard.md                     # the /analytics dashboard, its views, colour rules
+│   └── 📁 snapshots/                       # console evidence, organised by area
 │
 ├── 📁 terraform/
-│   ├── 📁 environments/prod/       # main.tf, variables.tf, terraform.tfvars
-│   └── 📁 modules/                 # 15 modules
-│       ├── 📁 pubsub/  networking/  healthcare-api/  bigquery/  dataflow/
-│       ├── 📁 data-governance/  audit-logging/  security-kms/  monitoring/
-│       ├── 📁 cloud-run-generator/  pipeline-jobs/  clinician-portal/
-│       └── 📁 portal-edge/  partner-api/  github-actions-wif/
+│   ├── 📁 environments/prod/
+│   │   ├── 📄 main.tf                      # module wiring + GCS remote state backend
+│   │   ├── 📄 variables.tf, outputs.tf, terraform.tfvars
+│   │   └── 📄 secrets.auto.tfvars.example  # IAP OAuth client (the real file is git-ignored)
+│   └── 📁 modules/                         # 15 modules
+│       ├── 📁 pubsub/                      # telemetry topic, dead-letter topic, subscriptions
+│       ├── 📁 networking/                  # VPC + subnets (asia-south1, us-central1)
+│       ├── 📁 healthcare-api/              # FHIR R4 dataset + store
+│       ├── 📁 bigquery/                    # dataset, 4 tables, 3 dashboard_* views, optional CMEK default
+│       ├── 📁 dataflow/                    # Flex Template streaming job
+│       ├── 📁 data-governance/             # Data Catalog taxonomy + policy tag
+│       ├── 📁 audit-logging/               # Data Access audit config (BigQuery, Healthcare API, DLP)
+│       ├── 📁 security-kms/                # key ring + key, grants for BigQuery / Pub/Sub agents
+│       ├── 📁 monitoring/                  # email channel, log-based error metric, alert policy
+│       ├── 📁 cloud-run-generator/         # generator job + Cloud Scheduler + Artifact Registry
+│       ├── 📁 pipeline-jobs/               # risk-scoring + alerting jobs, schedulers, token secret
+│       ├── 📁 clinician-portal/            # portal Cloud Run service
+│       ├── 📁 portal-edge/                 # DNS, HTTPS load balancer, IAP, Cloud Armor, managed cert
+│       ├── 📁 partner-api/                 # partner API Cloud Run service + Secret Manager
+│       └── 📁 github-actions-wif/          # Workload Identity Federation + CI deployer identity
 │
-├── 📁 generator/                   # synthetic patient generator (Cloud Run Job)
+├── 📁 generator/                           # synthetic patient generator (Cloud Run Job)
 ├── 📁 pipeline/
-│   ├── 📁 dataflow-beam/           # streaming pipeline: parse, DLP, FHIR + BigQuery
-│   └── 📁 risk-insight-processor/  # BigQuery ML score + Gemini explanation (Cloud Run Job)
-├── 📁 alerting/                    # Gmail API alert job (Cloud Run Job)
-├── 📁 portal/backend/              # clinician portal: FastAPI + Jinja2 + Chart.js
-│   └── 📁 templates/               # index, patient, analytics
-├── 📁 partner-api/backend/         # partner-clinic API: FastAPI, API key via Secret Manager
-├── 📁 sql/                         # table schemas, BQML model, base views
+│   ├── 📁 dataflow-beam/                   # streaming pipeline: parse, DLP, FHIR + BigQuery writes
+│   └── 📁 risk-insight-processor/          # BigQuery ML score + Gemini explanation (Cloud Run Job)
+├── 📁 alerting/                            # Gmail API alert job (Cloud Run Job)
+├── 📁 portal/backend/                      # clinician portal: FastAPI + Jinja2 + Chart.js
+│   └── 📁 templates/                       # index, patient, analytics
+├── 📁 partner-api/backend/                 # partner-clinic API: FastAPI, API key via Secret Manager
+├── 📁 sql/                                 # table schemas, BQML model, base views (run by hand)
+│   └── 📁 views/                           # observations_wide, latest_risk_scores, ...
 │
 └── 📁 .github/workflows/
-    ├── 📄 terraform.yml            # plan on push/PR; manual, destroy-guarded apply
-    └── 📄 build-and-deploy.yml     # rebuilds and rolls out the five app images
+    ├── 📄 terraform.yml                    # plan on push/PR; manual, destroy-guarded apply
+    └── 📄 build-and-deploy.yml             # rebuilds and rolls out the five app images
 ```
+
+Each app folder (`generator/`, `alerting/`, the two under `pipeline/`, `portal/backend/`
+and `partner-api/backend/`) holds a `main.py` (or `pipeline.py`), a `Dockerfile` and a
+`requirements.txt`.
 
 ---
 
@@ -575,13 +594,28 @@ Recorded here so nobody has to discover them:
 
 ## 📚 Documentation
 
+### 📖 Docs
+
 | Document | Contents |
 |---|---|
-| 🏛️ [`docs/architecture.md`](docs/architecture.md) | Data-flow diagram, status of every supporting service, repository layout |
-| 🧾 [`docs/known-deviations.md`](docs/known-deviations.md) | Every place the build differs from the plan, and the incidents behind them |
-| 🛡️ [`docs/compliance-controls.md`](docs/compliance-controls.md) | DLP, column-level security and audit logging — what each does and where its limits are |
-| 📈 [`docs/dashboard.md`](docs/dashboard.md) | The analytics dashboard, its data sources and colour rules |
+| 🏛️ [`docs/architecture.md`](docs/architecture.md) | The data-flow diagram; the built / partial / not-built status of every supporting service; the repository layout; and why FHIR, DLP with policy tags and audit logs, and BigQuery ML alongside Gemini |
+| 🧾 [`docs/known-deviations.md`](docs/known-deviations.md) | Every place the build differs from the plan, and why: regions, the pipeline, AI/ML, alerting (including the mailbox bounce), the Looker Studio decision, domain and DNS, the Partner API, security and governance, and the CI/CD failures in the order they happened |
+| 🛡️ [`docs/compliance-controls.md`](docs/compliance-controls.md) | DLP, column-level security and audit logging: what each does, where to see it, and its limits |
+| 📈 [`docs/dashboard.md`](docs/dashboard.md) | The `/analytics` dashboard: what it shows, the three views behind it, governance decisions, colour rules, why not Looker Studio, and limitations |
 | 📸 [`docs/snapshots/`](docs/snapshots/) | Console evidence, organised by area |
+
+### 🧭 Where to Look in the Code
+
+| Topic | Location |
+|---|---|
+| 🏗️ Infrastructure wiring | [`terraform/environments/prod/main.tf`](terraform/environments/prod/main.tf) |
+| 📈 Dashboard views | [`terraform/modules/bigquery/views.tf`](terraform/modules/bigquery/views.tf) |
+| 🔒 Column-level security | [`terraform/modules/data-governance/`](terraform/modules/data-governance/) and the schema templates in [`terraform/modules/bigquery/schemas/`](terraform/modules/bigquery/schemas/) |
+| 🔁 CI/CD | [`.github/workflows/terraform.yml`](.github/workflows/terraform.yml), [`build-and-deploy.yml`](.github/workflows/build-and-deploy.yml), and [`terraform/modules/github-actions-wif/`](terraform/modules/github-actions-wif/) |
+| 🌊 Streaming pipeline | [`pipeline/dataflow-beam/pipeline.py`](pipeline/dataflow-beam/pipeline.py) |
+| 🧠 Risk scoring | [`pipeline/risk-insight-processor/main.py`](pipeline/risk-insight-processor/main.py) and [`sql/bqml_model_risk_score.sql`](sql/bqml_model_risk_score.sql) |
+| 🖥️ Portal and analytics | [`portal/backend/main.py`](portal/backend/main.py) and [`portal/backend/templates/`](portal/backend/templates/) |
+| 🔌 Partner API | [`partner-api/backend/main.py`](partner-api/backend/main.py) |
 
 ---
 
@@ -589,8 +623,7 @@ Recorded here so nobody has to discover them:
 
 | Repository | Purpose |
 |---|---|
-| [`dhg-clinical-insights-demo`](https://github.com/bikram-singh/dhg-clinical-insights-demo) | This repo — a working healthcare telemetry pipeline on GCP with synthetic data |
-| [`gcp-solutions-architecture-blueprint`](https://github.com/bikram-singh/gcp-solutions-architecture-blueprint) | The paper architecture (MedSecure case study) this build proves out |
+| [`dhg-clinical-insights-demo`](https://github.com/bikram-singh/dhg-clinical-insights-demo) | A working healthcare telemetry pipeline on GCP, run end to end on synthetic data |
 
 ---
 
