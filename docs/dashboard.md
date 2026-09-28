@@ -11,7 +11,10 @@ average vitals by hour, risk assessments per hour by level, readings
 ingested per 15 minutes, and a patient table. It reads only the three
 `dashboard_*` views below, so it cannot display the policy-tagged columns.
 It is reachable only through the load balancer (IAP + Cloud Armor), so it
-is private by design and cannot be shared with a public link. Query results
+is private by design and cannot be shared with a public link. A risk badge marked "updating" means the assessment was computed
+before that patient's newest reading arrived (the scorer runs a few minutes
+after each ingest), so the vitals and the risk shown can briefly disagree.
+Query results
 are cached for 60 seconds. Its rendering logic was tested against faked
 BigQuery data; the SQL itself only runs against real BigQuery.
 

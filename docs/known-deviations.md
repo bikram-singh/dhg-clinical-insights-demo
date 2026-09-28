@@ -77,7 +77,12 @@ exactly what's real, what's approximated, and what's still open.
   heart rate, or low SpO2) used only so the demo has something structured
   to train a logistic regression against - documented in the SQL/schema
   comments. The resulting `ml_risk_score` is a demonstration output, not a
-  validated clinical model.
+  validated clinical model. In practice the score is effectively binary:
+  every score the dashboard has shown, at two decimals, was 0.00 or 1.00,
+  and no "medium" assessment appeared in a full day of data. That is what
+  you would expect when the label is a deterministic rule of the same
+  inputs the model sees (the likely cause, not investigated further), and it
+  means the medium band of the risk levels is never populated.
 - **`risk-insight-processor` is now scheduled** (5, 20, 35, 50 minutes past
   each hour - 5 minutes after each generator run), as a Cloud Run Job via
   Cloud Scheduler, same pattern as the generator. It ran manually for most

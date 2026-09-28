@@ -15,7 +15,7 @@
     .sub { color: #777; font-size: 13px; margin-bottom: 20px; }
     a.nav { color: #2c3e50; font-weight: bold; text-decoration: none; font-size: 14px; }
     a.nav:hover { text-decoration: underline; }
-    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
+    .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 18px; }
     .kpi { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .kpi .label { font-size: 12px; text-transform: uppercase; color: #777; }
     .kpi .value { font-size: 30px; font-weight: bold; margin-top: 6px; }
@@ -29,6 +29,7 @@
     th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
     th { background: #fafafa; font-size: 12px; text-transform: uppercase; color: #777; }
     .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
+    .pending { color: #999; font-size: 11px; margin-left: 6px; font-style: italic; }
     .foot { color: #999; font-size: 12px; margin-top: 14px; }
     @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
   </style>
@@ -43,6 +44,8 @@
     <div class="kpi"><div class="label">Patients monitored</div><div class="value">{{ kpis.patients }}</div></div>
     <div class="kpi"><div class="label">High risk now</div>
       <div class="value" style="color: {{ risk_colors.high }};">{{ kpis.high_risk }}</div></div>
+    <div class="kpi"><div class="label">High-risk assessments (24 h)</div>
+      <div class="value">{{ kpis.high_24h }}</div></div>
     <div class="kpi"><div class="label">Avg heart rate</div>
       <div class="value">{{ kpis.avg_hr if kpis.avg_hr is not none else "—" }} <span class="unit">bpm</span></div></div>
     <div class="kpi"><div class="label">Avg SpO2</div>
@@ -75,6 +78,7 @@
         <td>
           {% if p.risk_level %}
             <span class="badge" style="background: {{ risk_colors.get(p.risk_level, '#888') }};">{{ p.risk_level.upper() }}</span>
+            {% if p.assessment_pending %}<span class="pending" title="Risk was computed before this patient's newest reading arrived">updating</span>{% endif %}
           {% else %}<span style="color:#999;">not yet assessed</span>{% endif %}
         </td>
         <td>{{ "%.2f"|format(p.ml_risk_score) if p.ml_risk_score is not none else "—" }}</td>
@@ -89,7 +93,7 @@
 
   <div class="foot">
     Source: the dashboard_* BigQuery views, which never include the Gemini explanation text
-    or diagnostic report text. Results are cached for 60 seconds; the page refreshes every 5 minutes.
+    or diagnostic report text. "Updating" means the risk shown was computed before that patient's newest reading arrived (the scorer runs a few minutes after each ingest). Results are cached for 60 seconds; the page refreshes every 5 minutes.
   </div>
 
   <script>

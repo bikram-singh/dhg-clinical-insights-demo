@@ -132,7 +132,7 @@ def fetch_snapshot():
     return _rows(f"""
         SELECT patient_id, last_reading_at, minutes_since_last_reading,
                heart_rate, spo2, bp_systolic, bp_diastolic,
-               ml_risk_score, risk_level
+               ml_risk_score, risk_level, assessed_at
         FROM `{PROJECT_ID}.{BQ_DATASET}.dashboard_patient_snapshot`
         ORDER BY ml_risk_score DESC, patient_id
     """)
@@ -176,6 +176,16 @@ def _label(ts, fmt="%d %b %H:%M"):
     return ts.astimezone(timezone.utc).strftime(fmt) if ts else ""
 
 
+def _hour_labels(stamps):
+    """Hour labels; the first one and each midnight carry the date, so a
+    24-hour axis doesn't show the same clock time at both ends."""
+    labels = []
+    for i, ts in enumerate(stamps):
+        utc = ts.astimezone(timezone.utc)
+        labels.append(utc.strftime("%d %b %H:%M") if i == 0 or utc.hour == 0 else utc.strftime("%H:%M"))
+    return labels
+
+
 def _r(value, digits=1):
     return round(value, digits) if value is not None else None
 
@@ -197,6 +207,7 @@ def build_analytics_context():
     kpis = {
         "patients": len(snapshot),
         "high_risk": sum(1 for p in snapshot if p.get("risk_level") == "high"),
+        "high_24h": sum(r["n"] for r in risk_hourly if r["risk_level"] == "high"),
         "avg_hr": _r(_avg(snapshot, "heart_rate")),
         "avg_spo2": _r(_avg(snapshot, "spo2")),
         "freshest_min": min(ages) if ages else None,
@@ -205,8 +216,15 @@ def build_analytics_context():
     patients = []
     for p in snapshot:
         sys_, dia = p.get("bp_systolic"), p.get("bp_diastolic")
+        assessed, read = p.get("assessed_at"), p.get("last_reading_at")
         patients.append({
             **p,
+            # The risk shown was computed before this patient's newest reading
+            # arrived (the scorer runs a few minutes after each ingest).
+            "assessment_pending": bool(
+                p.get("risk_level") is not None and assessed is not None
+                and read is not None and assessed < read
+            ),
             "bp": f"{round(sys_)}/{round(dia)}" if sys_ is not None and dia is not None else "—",
             "last_reading_label": _label(p.get("last_reading_at")),
         })
@@ -214,7 +232,7 @@ def build_analytics_context():
     hours = sorted({r["hour"] for r in risk_hourly})
     charts = {
         "vitals": {
-            "labels": [_label(v["hour"], "%H:%M") for v in vitals],
+            "labels": _hour_labels([v["hour"] for v in vitals]),
             "heart_rate": [_r(v["heart_rate"]) for v in vitals],
             "bp_systolic": [_r(v["bp_systolic"]) for v in vitals],
             "spo2": [_r(v["spo2"]) for v in vitals],
@@ -225,7 +243,7 @@ def build_analytics_context():
             "colors": [RISK_COLORS[lv] for lv in levels],
         },
         "risk_by_hour": {
-            "labels": [_label(h, "%H:%M") for h in hours],
+            "labels": _hour_labels(hours),
             "datasets": [
                 {
                     "label": lv,
