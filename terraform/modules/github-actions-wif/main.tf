@@ -45,8 +45,14 @@ resource "google_service_account" "github_actions" {
   description  = "Impersonated by GitHub Actions via Workload Identity Federation - never given a downloaded key"
 }
 
-# Only workflow runs FROM THIS REPO'S main branch can impersonate the
-# deployer service account - a PR from a branch, or any other repo, cannot.
+# Only workflows running in THIS REPO can impersonate the deployer service
+# account - other repos and forks cannot. This is a repo restriction, NOT a
+# branch restriction: a workflow on any branch of this repo (including one
+# pushed by a collaborator with write access) can assume this identity, which
+# holds Editor plus several IAM-admin roles. To limit it to main, add
+# `&& assertion.ref == 'refs/heads/main'` to the provider's
+# attribute_condition - at the cost of pull_request plan runs no longer
+# authenticating (their ref is refs/pull/N/merge).
 resource "google_service_account_iam_member" "github_can_impersonate" {
   service_account_id = google_service_account.github_actions.name
   role                = "roles/iam.workloadIdentityUser"

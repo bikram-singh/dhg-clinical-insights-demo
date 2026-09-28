@@ -80,12 +80,17 @@ piece of the architecture above is real and deployed, organized by area:
 - [`alerting/`](docs/snapshots/alerting/) — a real high-risk alert email
   sent by the alerting service
 - [`compute/`](docs/snapshots/compute/) — Cloud Run services/jobs, Cloud
-  Scheduler, Artifact Registry
+  Scheduler (all three schedules and their recent runs), Artifact Registry,
+  and the portal's ingress locked to the load balancer
 - [`networking/`](docs/snapshots/networking/) — VPC, Load Balancer, Cloud
   DNS, managed SSL certificate
 - [`security-governance/`](docs/snapshots/security-governance/) — IAM,
   Dataplex/Data Catalog policy tags, Cloud Audit Logs, Cloud Armor, IAP,
-  Secret Manager
+  Secret Manager, the Cloud KMS key and its use as the BigQuery dataset's
+  default encryption, and the Cloud Monitoring alert
+- [`cicd/`](docs/snapshots/cicd/) — the Workload Identity Federation pool
+  GitHub Actions authenticates through, its provider's repo-only condition,
+  and the versioned GCS bucket that holds the shared Terraform state
 - [`portal-access-demo/`](docs/snapshots/portal-access-demo/) — the
   Clinician Portal's patient list/detail pages and the real IAP sign-in flow
 - [`oauth-setup/`](docs/snapshots/oauth-setup/) — the OAuth consent screen

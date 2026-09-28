@@ -297,8 +297,13 @@ hit:
    per resource type across ~15 Google APIs. A real production CI/CD
    identity should be scoped far more narrowly (e.g. per-service custom
    roles), and the Workload Identity Federation trust itself is
-   correctly locked to this exact repo (`attribute_condition`) so at
-   least the *identity* can't be impersonated from anywhere else.
+   locked to this exact repo (`attribute_condition`), so no other repo
+   or fork can impersonate the identity. That is a repo restriction, not
+   a branch restriction: a workflow on any branch of this repo can assume
+   the deployer identity. Restricting it to `main` is a one-line addition
+   to the condition (`&& assertion.ref == 'refs/heads/main'`), at the
+   cost of PR plan runs no longer authenticating; not done here because
+   this is a single-owner repo where only the owner pushes.
 6. **A partial push made CI try to delete live infrastructure.** The KMS
    and Monitoring resources had been applied locally, but the commit
    that went to GitHub contained only an unrelated one-file change - the
