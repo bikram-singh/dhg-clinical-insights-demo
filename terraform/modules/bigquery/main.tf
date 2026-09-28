@@ -1,14 +1,19 @@
 resource "google_bigquery_dataset" "caretrack" {
-  dataset_id                 = var.dataset_id
-  project                    = var.project_id
-  location                   = var.region
-  labels                      = var.labels
+  dataset_id                      = var.dataset_id
+  project                         = var.project_id
+  location                        = var.region
+  labels                          = var.labels
   default_partition_expiration_ms = null
 
-  # CMEK - key resource created in the iam-security module, referenced here
-  # default_encryption_configuration {
-  #   kms_key_name = var.kms_key_name
-  # }
+  # CMEK - only applies to NEW tables created after this is set, not the
+  # 4 existing populated tables (BigQuery doesn't retroactively
+  # re-encrypt). See docs/known-deviations.md.
+  dynamic "default_encryption_configuration" {
+    for_each = var.kms_key_name != "" ? [1] : []
+    content {
+      kms_key_name = var.kms_key_name
+    }
+  }
 }
 
 resource "google_bigquery_table" "patients" {

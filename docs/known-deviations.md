@@ -143,11 +143,41 @@ exactly what's real, what's approximated, and what's still open.
   uses - there's no separate "Dataplex" Terraform resource type for this.
   Two columns are tagged: `diagnostic_reports.report_text_redacted` and
   `risk_assessments.gemini_explanation`.
-- **Cloud KMS (CMEK), VPC Service Controls, Cloud Monitoring dashboards/
-  alert policies, Looker Studio, and cost/budget alerts** are all part of
-  the original design and not yet built. BigQuery/Pub/Sub use
-  Google-managed encryption; there's no custom monitoring beyond default
-  Cloud Logging.
+- **Cloud KMS (CMEK) is applied to the BigQuery dataset only, not
+  Pub/Sub.** The dataset's default encryption config only affects tables
+  created after it's set - the 4 existing, populated tables keep
+  Google-managed encryption unless individually recreated (BigQuery
+  doesn't retroactively re-encrypt). Pub/Sub CMEK was deliberately
+  skipped: changing `kms_key_name` on an existing topic forces Terraform
+  to destroy and recreate it, which would have disrupted the live,
+  actively-publishing generator and its subscriptions for no real
+  benefit this late in the build. The KMS key and the Pub/Sub service
+  agent's grant on it both already exist and are ready for this, whenever
+  a deliberate, carefully-timed topic recreation (or a fresh project) is
+  worth doing.
+- **VPC Service Controls was not attempted.** This is a fundamentally
+  different class of change from everything else in this repo: an
+  **org-level** singleton resource (one Access Context Manager policy per
+  organization, not per project), where a misconfigured perimeter can
+  instantly cut off access to BigQuery/Healthcare API/Cloud Build/GitHub
+  Actions CI for every identity not explicitly allowed - all at once,
+  across a project with several live, actively-used services. Given that,
+  this was judged not worth attempting as a late addition to a working
+  system. A real implementation would need: an Access Context Manager
+  policy at the org level, a service perimeter around this project
+  restricting `bigquery.googleapis.com`/`healthcare.googleapis.com`/
+  `storage.googleapis.com`, and carefully scoped ingress/egress rules for
+  Cloud Build and GitHub Actions' Workload Identity Federation calls
+  specifically (both come from outside the perimeter and would otherwise
+  be blocked along with everything else).
+- **Cloud Monitoring is a log-based metric + threshold alert, not
+  Dataflow-specific system metrics or uptime checks.** Scope: email the
+  clinician if any of the 3 scheduled Cloud Run Jobs (generator,
+  risk-processor, alerting) logs an ERROR or higher. Uptime checks were
+  skipped for the portal/partner-api specifically because both are
+  IAM-protected - a standard anonymous uptime check would always get
+  `403` and constantly "fail," which isn't a real health signal, just
+  noise.
 
 ## Automation
 

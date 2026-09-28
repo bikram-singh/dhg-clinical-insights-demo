@@ -69,6 +69,7 @@ module "bigquery" {
   region                    = var.region
   labels                    = var.labels
   sensitive_policy_tag_name = module.data_governance.policy_tag_name
+  kms_key_name              = module.security_kms.crypto_key_id
 }
 
 module "healthcare_api" {
@@ -172,4 +173,17 @@ module "github_actions_wif" {
   source      = "../../modules/github-actions-wif"
   project_id  = var.project_id
   github_repo = var.github_repo
+}
+
+module "security_kms" {
+  source         = "../../modules/security-kms"
+  project_id     = var.project_id
+  project_number = data.google_project.current.number
+  region         = var.region
+}
+
+module "monitoring" {
+  source       = "../../modules/monitoring"
+  project_id   = var.project_id
+  notify_email = var.clinician_emails[0]
 }

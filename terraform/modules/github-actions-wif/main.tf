@@ -66,6 +66,13 @@ resource "google_project_iam_member" "github_actions_roles" {
     "roles/iam.securityAdmin",
     "roles/artifactregistry.admin",
     "roles/secretmanager.admin",
+    # Editor deliberately excludes these too, same reasoning as Secret
+    # Manager above - Cloud KMS key management and Monitoring alert
+    # policy management are both security/ops-sensitive and not granted
+    # by a broad Editor role.
+    "roles/cloudkms.admin",
+    "roles/monitoring.admin",
+    "roles/logging.admin",
   ])
 
   project = var.project_id
