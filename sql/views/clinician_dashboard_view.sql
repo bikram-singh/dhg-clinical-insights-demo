@@ -1,3 +1,12 @@
+-- SUPERSEDED - do not use. This view was drafted for the dashboard but:
+--   * it starts from the `patients` table, which the pipeline never
+--     populates (0 rows), so it would return no rows; and
+--   * it selects gemini_explanation, a column protected by a Data Catalog
+--     policy tag, so a shared dashboard on it would either fail or bypass
+--     the column-level security.
+-- The Looker Studio dashboard uses the dashboard_* views defined in
+-- terraform/modules/bigquery/views.tf instead. See docs/dashboard.md.
+--
 -- Convenience view for the clinician portal and Looker Studio dashboard.
 -- Joins each patient to their latest observations and latest risk assessment.
 
