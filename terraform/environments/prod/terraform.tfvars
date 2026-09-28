@@ -10,12 +10,12 @@ generator_schedule_cron = "*/15 * * * *"
 portal_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/portal:latest"
 clinician_emails = ["admin@gcpcloudhub.in"]
 
-# TEMPORARY: gcpcloudhub.in's root DNS is broken (SERVFAIL / FAILED_CAA_CHECKING),
-# so the real IAP/domain path can't work yet. Reopening ingress lets
-# `gcloud run services proxy` reach the portal directly in the meantime.
-# Set back to "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" once the domain's
-# DNS is actually fixed.
-portal_ingress = "INGRESS_TRAFFIC_ALL"
+# Locked to the load balancer: all browser traffic goes through the
+# IAP + Cloud Armor path on dhg-caretrack.gcpcloudhub.in. The direct
+# Cloud Run URL and `gcloud run services proxy` no longer reach the
+# portal. To temporarily reopen direct access for debugging, set this to
+# "INGRESS_TRAFFIC_ALL" and apply - and set it back afterwards.
+portal_ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 partner_api_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/partner-api:latest"
 risk_processor_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/risk-processor:latest"
 alerting_image = "us-central1-docker.pkg.dev/dhg-caretrack/apps/alerting:latest"
