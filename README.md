@@ -122,6 +122,11 @@ the start.
 
 ## 🏛️ Architecture
 
+![Architecture diagram](docs/diagrams/architecture-diagram.svg)
+
+<details>
+<summary>Prefer plain text? Expand for the ASCII version</summary>
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │ INGESTION                                                                                    │
@@ -180,6 +185,8 @@ the start.
 │ plan on push, guarded manual apply  |  Secret Manager  |  Cloud KMS  |  Cloud Monitoring     │
 └──────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+</details>
 
 The full annotated diagram and component-by-component breakdown live in
 [`docs/architecture.md`](docs/architecture.md).
